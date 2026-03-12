@@ -114,16 +114,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// 翻译处理函数
+// 翻译处理函数 - 修复批量翻译，确保 format=text 正确传递
 async function handleTranslation({ q, source, target, format = 'text' }) {
   const settings = await getSettings();
   
   if (!settings.apiUrl) {
-    throw new Error('请先配置翻译API地址');
+    throw new Error('请先配置翻译 API 地址');
   }
 
+  // 使用 FormData 发送翻译请求，支持数组和字符串两种格式
   const formData = new FormData();
-  // 支持数组和字符串两种格式的q参数
   if (Array.isArray(q)) {
     q.forEach(text => formData.append('q', text));
   } else {
@@ -141,18 +141,28 @@ async function handleTranslation({ q, source, target, format = 'text' }) {
     const response = await fetch(`${settings.apiUrl.replace(/\/$/, '')}/translate`, {
       method: 'POST',
       body: formData,
-      signal: AbortSignal.timeout(15000) // 15秒超时（分批翻译每批超时时间）
+      signal: AbortSignal.timeout(15000)
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
-      throw new Error(errorData?.error || `翻译请求失败: ${response.status}`);
+      throw new Error(errorData?.error || `翻译请求失败：${response.status}`);
     }
 
-    const result = await response.json();
+    let result = await response.json();
+    
+    // 处理 API 返回的 translatedText 是 JSON 字符串的情况
+    if (typeof result.translatedText === 'string') {
+      try {
+        result.translatedText = JSON.parse(result.translatedText);
+      } catch (e) {
+        // 如果不是 JSON 字符串，保持原样
+      }
+    }
+    
     return result;
   } catch (error) {
-    throw new Error(`翻译失败: ${error.message}`);
+    throw new Error(`翻译失败：${error.message}`);
   }
 }
 
@@ -161,22 +171,22 @@ async function getSupportedLanguages() {
   const settings = await getSettings();
   
   if (!settings.apiUrl) {
-    throw new Error('请先配置翻译API地址');
+    throw new Error('请先配置翻译 API 地址');
   }
 
   try {
     const response = await fetch(`${settings.apiUrl.replace(/\/$/, '')}/languages`, {
-      signal: AbortSignal.timeout(10000) // 10秒超时
+      signal: AbortSignal.timeout(10000) // 10 秒超时
     });
     
     if (!response.ok) {
-      throw new Error(`获取语言列表失败: ${response.status}`);
+      throw new Error(`获取语言列表失败：${response.status}`);
     }
 
     const languages = await response.json();
     return languages;
   } catch (error) {
-    throw new Error(`获取语言列表失败: ${error.message}`);
+    throw new Error(`获取语言列表失败：${error.message}`);
   }
 }
 

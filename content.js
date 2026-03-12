@@ -254,7 +254,17 @@ async function translateBatch(batch, source, target, config) {
         throw new Error(response.error || 'Translation failed');
       }
 
-      const translations = response.data.translatedText || [];
+      let translations = response.data.translatedText || [];
+      
+      // 处理 API 返回 JSON 字符串的情况
+      if (typeof translations === 'string') {
+        try {
+          translations = JSON.parse(translations);
+        } catch (e) {
+          // 如果不是 JSON 字符串，转为数组
+          translations = [translations];
+        }
+      }
       
       // 应用翻译结果
       batch.forEach((node, index) => {
