@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const resultArea = document.getElementById('resultArea');
   const settingsBtn = document.getElementById('settingsBtn');
   const translatePageBtn = document.getElementById('translatePageBtn');
+  const restorePageBtn = document.getElementById('restorePageBtn');
   const copyBtn = document.getElementById('copyBtn');
   const loadingDiv = document.getElementById('loading');
   const errorDiv = document.getElementById('error');
@@ -56,6 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 翻译整个页面按钮
     translatePageBtn.addEventListener('click', translateEntirePage);
+
+    // 还原页面按钮
+    restorePageBtn.addEventListener('click', restoreOriginalPage);
 
     // 复制按钮
     copyBtn.addEventListener('click', copyResult);
@@ -187,6 +191,22 @@ document.addEventListener('DOMContentLoaded', () => {
       window.close();
     } catch (error) {
       showError(`页面翻译失败: ${error.message}`);
+    }
+  }
+
+  // 还原页面到原始状态
+  async function restoreOriginalPage() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      // 向内容脚本发送还原页面的消息
+      await chrome.tabs.sendMessage(tab.id, {
+        action: 'restoreOriginalPage'
+      });
+
+      window.close();
+    } catch (error) {
+      showError(`页面还原失败: ${error.message}`);
     }
   }
 

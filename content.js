@@ -1,6 +1,7 @@
 // 内容脚本 - 注入到网页中
 let originalTexts = new Map();
 let isTranslating = false;
+let currentTranslationTarget = 'zh-Hans';
 
 // 监听来自扩展的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -13,12 +14,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       translateSelection(request.data.source, request.data.target);
       sendResponse({ success: true });
       break;
+    case 'restoreOriginalPage':
+      restoreOriginalPage();
+      sendResponse({ success: true });
+      break;
   }
   return true;
 });
 
 // 翻译整个页面
-async function translateEntirePage(source = 'auto', target = 'zh') {
+async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   if (isTranslating) {
     showNotification('正在翻译中，请稍候...');
     return;
@@ -108,8 +113,33 @@ async function translateEntirePage(source = 'auto', target = 'zh') {
   }
 }
 
+// 还原页面到原始状态
+function restoreOriginalPage() {
+  if (isTranslating) {
+    showNotification('正在翻译中，无法还原');
+    return;
+  }
+
+  if (originalTexts.size === 0) {
+    showNotification('没有可还原的内容');
+    return;
+  }
+
+  try {
+    originalTexts.forEach((originalText, node) => {
+      if (node.parentNode) { // 确保节点仍然存在
+        node.textContent = originalText;
+      }
+    });
+    originalTexts.clear();
+    showNotification('页面已还原到原始状态');
+  } catch (error) {
+    showNotification(`还原失败: ${error.message}`, 'error');
+  }
+}
+
 // 翻译选中的文本
-async function translateSelection(source = 'auto', target = 'zh') {
+async function translateSelection(source = 'auto', target = 'zh-Hans') {
   const selection = window.getSelection();
   const text = selection.toString().trim();
   
@@ -132,7 +162,7 @@ async function translateSelection(source = 'auto', target = 'zh') {
     });
 
     if (response.success) {
-      showTranslationPopup(selection, response.data.translatedText);
+      showTranslationPopup(selection, response.data.translatedText, source, target);
     } else {
       showNotification(`翻译失败: ${response.error}`, 'error');
     }
@@ -142,7 +172,7 @@ async function translateSelection(source = 'auto', target = 'zh') {
 }
 
 // 显示翻译弹窗
-function showTranslationPopup(selection, translatedText) {
+function showTranslationPopup(selection, translatedText, source = 'auto', currentTarget = 'zh-Hans') {
   // 移除之前的弹窗
   const oldPopup = document.getElementById('libretranslate-popup');
   if (oldPopup) {
@@ -177,8 +207,19 @@ function showTranslationPopup(selection, translatedText) {
       <button id="libretranslate-close" style="background: none; border: none; font-size: 16px; cursor: pointer; padding: 0 4px; color: #999;">×</button>
     </div>
     <div style="white-space: pre-wrap; word-wrap: break-word;">${translatedText}</div>
-    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; display: flex; gap: 8px;">
+    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; display: flex; gap: 8px; flex-wrap: wrap;">
       <button id="libretranslate-copy" style="background: #f0f0f0; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer;">复制</button>
+      <select id="libretranslate-switch-lang" style="background: #f0f0f0; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer;">
+        <option value="">切换语言</option>
+        <option value="en">英语</option>
+        <option value="zh-Hans">中文（简体）</option>
+        <option value="ja">日语</option>
+        <option value="ko">韩语</option>
+        <option value="fr">法语</option>
+        <option value="de">德语</option>
+        <option value="es">西班牙语</option>
+        <option value="ru">俄语</option>
+      </select>
     </div>
   `;
 
@@ -201,6 +242,42 @@ function showTranslationPopup(selection, translatedText) {
     } catch (error) {
       alert('复制失败');
     }
+  });
+
+  // 切换语言功能
+  const langSelect = popup.querySelector('#libretranslate-switch-lang');
+  const originalText = selection.toString().trim();
+  
+  langSelect.addEventListener('change', async () => {
+    const newTarget = langSelect.value;
+    if (!newTarget) return;
+    
+    try {
+      showNotification('翻译中...');
+      const response = await chrome.runtime.sendMessage({
+        action: 'translate',
+        data: {
+          q: originalText,
+          source,
+          target: newTarget,
+          format: 'text'
+        }
+      });
+
+      if (response.success) {
+        // 更新翻译结果
+        const resultDiv = popup.querySelector('div[style*="white-space: pre-wrap"]');
+        resultDiv.textContent = response.data.translatedText;
+        showNotification('翻译完成');
+      } else {
+        showNotification(`翻译失败: ${response.error}`, 'error');
+      }
+    } catch (error) {
+      showNotification(`翻译失败: ${error.message}`, 'error');
+    }
+    
+    // 重置选择
+    langSelect.value = '';
   });
 
   // 点击外部关闭

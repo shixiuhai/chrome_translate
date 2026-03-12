@@ -159,7 +159,7 @@
     <div class="form-group">
       <label for="defaultTarget">默认目标语言</label>
       <select id="defaultTarget">
-        <option value="zh">中文</option>
+        <option value="zh-Hans">中文（简体）</option>
       </select>
     </div>
 
@@ -178,21 +178,20 @@
     </div>
 
     <div class="form-group">
+      <label for="autoTranslateExcludedSites">自动翻译排除网站</label>
+      <input type="text" id="autoTranslateExcludedSites" placeholder="例如: google.com,github.com">
+      <div class="hint">逗号分隔的网站域名，这些网站不会自动翻译</div>
+    </div>
+
+    <div class="form-group">
       <label>快捷键 1 (默认：Ctrl+Shift+T / Cmd+Shift+T)</label>
       <div style="display: flex; gap: 10px; margin-bottom: 8px;">
         <select id="shortcut1Action" style="flex: 1;">
           <option value="translateSelection">翻译选中文本</option>
           <option value="translatePage">翻译整个页面</option>
+          <option value="restoreOriginalPage">还原页面原文</option>
         </select>
         <select id="shortcut1Target" style="width: 120px;">
-          <option value="zh">中文</option>
-          <option value="en">英语</option>
-          <option value="ja">日语</option>
-          <option value="ko">韩语</option>
-          <option value="fr">法语</option>
-          <option value="de">德语</option>
-          <option value="es">西班牙语</option>
-          <option value="ru">俄语</option>
         </select>
       </div>
       <div class="hint">选择快捷键 1 触发的功能和目标语言</div>
@@ -204,16 +203,9 @@
         <select id="shortcut2Action" style="flex: 1;">
           <option value="translateSelection">翻译选中文本</option>
           <option value="translatePage">翻译整个页面</option>
+          <option value="restoreOriginalPage">还原页面原文</option>
         </select>
         <select id="shortcut2Target" style="width: 120px;">
-          <option value="zh">中文</option>
-          <option value="en">英语</option>
-          <option value="ja">日语</option>
-          <option value="ko">韩语</option>
-          <option value="fr">法语</option>
-          <option value="de">德语</option>
-          <option value="es">西班牙语</option>
-          <option value="ru">俄语</option>
         </select>
       </div>
       <div class="hint">选择快捷键 2 触发的功能和目标语言</div>

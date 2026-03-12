@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadingDiv = document.getElementById('loading');
   const autoTranslateCheckbox = document.getElementById('autoTranslate');
   const autoTranslateLanguagesInput = document.getElementById('autoTranslateLanguages');
+  const autoTranslateExcludedSitesInput = document.getElementById('autoTranslateExcludedSites');
   const shortcut1ActionSelect = document.getElementById('shortcut1Action');
   const shortcut1TargetSelect = document.getElementById('shortcut1Target');
   const shortcut2ActionSelect = document.getElementById('shortcut2Action');
@@ -26,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 加载设置
   function loadSettings() {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target'], (result) => {
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target'], (result) => {
       if (result.apiUrl) {
         apiUrlInput.value = result.apiUrl;
         loadLanguages(result.apiUrl, result.apiKey).then(() => {
@@ -35,6 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           if (result.defaultTarget) {
             defaultTargetSelect.value = result.defaultTarget;
+          }
+          // 设置快捷键目标语言选择
+          if (result.shortcut1Target) {
+            shortcut1TargetSelect.value = result.shortcut1Target;
+          }
+          if (result.shortcut2Target) {
+            shortcut2TargetSelect.value = result.shortcut2Target;
           }
         });
       } else {
@@ -49,19 +57,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       autoTranslateCheckbox.checked = result.autoTranslate || false;
       autoTranslateLanguagesInput.value = result.autoTranslateLanguages ? result.autoTranslateLanguages.join(',') : '';
+      autoTranslateExcludedSitesInput.value = result.autoTranslateExcludedSites ? result.autoTranslateExcludedSites.join(',') : '';
 
       // 加载快捷键配置
       if (result.shortcut1Action) {
         shortcut1ActionSelect.value = result.shortcut1Action;
       }
-      if (result.shortcut1Target) {
-        shortcut1TargetSelect.value = result.shortcut1Target;
-      }
       if (result.shortcut2Action) {
         shortcut2ActionSelect.value = result.shortcut2Action;
-      }
-      if (result.shortcut2Target) {
-        shortcut2TargetSelect.value = result.shortcut2Target;
       }
     });
   }
@@ -81,6 +84,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // 清空现有选项
       defaultSourceSelect.innerHTML = '<option value="auto">自动检测</option>';
       defaultTargetSelect.innerHTML = '';
+      shortcut1TargetSelect.innerHTML = '';
+      shortcut2TargetSelect.innerHTML = '';
       
       // 添加语言选项
       languages.forEach(lang => {
@@ -93,6 +98,16 @@ document.addEventListener('DOMContentLoaded', () => {
         option2.value = lang.code;
         option2.textContent = `${lang.name} (${lang.code})`;
         defaultTargetSelect.appendChild(option2);
+        
+        const option3 = document.createElement('option');
+        option3.value = lang.code;
+        option3.textContent = `${lang.name} (${lang.code})`;
+        shortcut1TargetSelect.appendChild(option3);
+        
+        const option4 = document.createElement('option');
+        option4.value = lang.code;
+        option4.textContent = `${lang.name} (${lang.code})`;
+        shortcut2TargetSelect.appendChild(option4);
       });
 
       showStatus('语言列表加载成功', 'success');
@@ -114,6 +129,10 @@ document.addEventListener('DOMContentLoaded', () => {
       .split(',')
       .map(lang => lang.trim())
       .filter(lang => lang);
+    const autoTranslateExcludedSites = autoTranslateExcludedSitesInput.value
+      .split(',')
+      .map(site => site.trim())
+      .filter(site => site);
     const shortcut1Action = shortcut1ActionSelect.value;
     const shortcut1Target = shortcut1TargetSelect.value;
     const shortcut2Action = shortcut2ActionSelect.value;
@@ -131,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
       defaultTarget,
       autoTranslate,
       autoTranslateLanguages,
+      autoTranslateExcludedSites,
       shortcut1Action,
       shortcut1Target,
       shortcut2Action,
@@ -170,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const formData = new FormData();
       formData.append('q', 'Hello');
       formData.append('source', 'en');
-      formData.append('target', 'zh');
+      formData.append('target', 'zh-Hans');
       if (apiKey) {
         formData.append('api_key', apiKey);
       }
