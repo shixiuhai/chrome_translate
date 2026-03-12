@@ -4,7 +4,7 @@ let isTranslating = false;
 let currentTranslationTarget = 'zh-Hans';
 let translationObserver = null;
 
-// 改进的文本节点收集和翻译函数
+// 改进的页面翻译函数 - 使用HTML格式一次性翻译整个页面
 async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   if (isTranslating) {
     showNotification('正在翻译中，请稍候...');
@@ -15,179 +15,87 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   currentTranslationTarget = target;
   showNotification('开始翻译页面...');
 
+  console.log('=== 开始页面翻译 (HTML格式) ===');
+  console.log('源语言:', source, '目标语言:', target);
+
   try {
-    // 收集所有文本节点
-    const textNodes = [];
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: function(node) {
-          // 跳过不需要翻译的元素
-          const parent = node.parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          
-          const tagName = parent.tagName.toUpperCase();
-          
-          // 扩展排除标签列表
-          const excludedTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'INPUT', 'TEXTAREA', 'CODE', 'PRE'];
-          
-          if (excludedTags.includes(tagName) || parent.isContentEditable) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          
-          const text = node.textContent.trim();
-          
-          // 调整长度判断，允许翻译2-50个字符的文本（避免过短或过长的文本）
-          if (text.length < 2 || text.length > 5000) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          
-          // 改进纯数字判断（允许带小数点、逗号分隔的数字）
-          if (/^\d+([,.]\d+)*$/.test(text)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
-    );
-
-    let node;
-    let processedCount = 0;
-    while (node = walker.nextNode()) {
-      const text = node.textContent.trim();
-      if (text && text.length >= 2 && text.length <= 5000) {
-        textNodes.push({ node, text });
-        processedCount++;
-      }
-    }
-
-    // 调试信息
-    console.log(`找到 ${textNodes.length} 个待翻译文本节点`);
-    showNotification(`找到 ${textNodes.length} 个文本节点，开始翻译...`);
+    // 保存页面原始HTML用于还原
+    const originalHtml = document.documentElement.outerHTML;
+    originalTexts.set(document.documentElement, { text: originalHtml, isFullPage: true });
     
-    if (textNodes.length === 0) {
-      showNotification('页面没有可翻译的文本内容', 'warning');
-      isTranslating = false;
-      return;
-    }
-
-    // 批量翻译，增加重试机制
-    const batchSize = 30;
-    const maxRetries = 2;
-    let successCount = 0;
-    let failCount = 0;
+    // 获取整个页面的HTML内容
+    const pageHtml = document.documentElement.outerHTML;
+    console.log('页面HTML长度:', pageHtml.length);
     
-    for (let i = 0; i < textNodes.length; i += batchSize) {
-      const batch = textNodes.slice(i, i + batchSize);
-      const texts = batch.map(item => item.text);
+    if (pageHtml.length > 100000) {
+      showNotification('页面内容过大，将分批翻译...', 'warning');
+    }
+    
+    // 发送翻译请求 - 使用HTML格式
+    const response = await chrome.runtime.sendMessage({
+      action: 'translate',
+      data: {
+        q: pageHtml,
+        source,
+        target,
+        format: 'html'
+      }
+    });
+
+    if (response.success && response.data && response.data.translatedText) {
+      const translatedHtml = response.data.translatedText;
+      console.log('翻译结果长度:', translatedHtml.length);
+      console.log('翻译结果前200字符:', translatedHtml.substring(0, 200));
       
-      let retries = 0;
-      let batchSuccess = false;
-      
-      while (retries < maxRetries && !batchSuccess) {
+      // 检查返回的是否是有效的HTML
+      if (translatedHtml && translatedHtml.length > 0) {
         try {
-          const response = await chrome.runtime.sendMessage({
-            action: 'translate',
-            data: {
-              q: texts,
-              source,
-              target,
-              format: 'html'
-            }
-          });
-
-          if (response.success) {
-            const translations = Array.isArray(response.data.translatedText)
-              ? response.data.translatedText
-              : [response.data.translatedText];
-              
-            // 调试信息
-            console.log(`翻译批次 ${Math.floor(i/batchSize) + 1}: 收到 ${translations.length} 条翻译结果`);
-            
-            batch.forEach((item, index) => {
-              if (translations[index]) {
-                // 检查是否需要存储原始文本
-                if (!originalTexts.has(item.node)) {
-                  originalTexts.set(item.node, {
-                    text: item.text,
-                    isHTML: false
-                  });
-                }
-                
-                try {
-                  const originalNodeText = item.node.textContent;
-                  const leadingWhitespace = originalNodeText.match(/^\s*/)[0];
-                  const trailingWhitespace = originalNodeText.match(/\s*$/)[0];
-                  
-                  // 检查翻译结果是否包含HTML标签
-                  if (/<[a-z][\s\S]*>/i.test(translations[index])) {
-                    // 尝试使用innerHTML（仅当父元素允许时）
-                    const parent = item.node.parentElement;
-                    if (parent && parent.tagName !== 'SCRIPT' && parent.tagName !== 'STYLE') {
-                      try {
-                        // 创建一个临时元素来安全解析HTML
-                        const temp = document.createElement('div');
-                        temp.innerHTML = leadingWhitespace + translations[index] + trailingWhitespace;
-                        
-                        // 检查是否包含危险内容
-                        const hasScript = temp.querySelector('script,style,iframe,object,embed');
-                        if (!hasScript) {
-                          item.node.textContent = temp.textContent;
-                        } else {
-                          item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
-                        }
-                      } catch (e) {
-                        item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
-                      }
-                    } else {
-                      item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
-                    }
-                  } else {
-                    // 普通文本替换
-                    item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
-                  }
-                  successCount++;
-                } catch (e) {
-                  console.error('更新文本节点失败:', e);
-                  failCount++;
-                }
-              }
-            });
-            
-            batchSuccess = true;
-          } else {
-            throw new Error(response.error || '翻译失败');
-          }
-        } catch (error) {
-          retries++;
-          console.error(`批次翻译失败 (尝试 ${retries}/${maxRetries}):`, error);
+          // 使用 DOMParser 解析翻译后的HTML
+          const parser = new DOMParser();
+          const translatedDoc = parser.parseFromString(translatedHtml, 'text/html');
           
-          if (retries < maxRetries) {
-            // 等待后重试
-            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          // 检查解析是否成功
+          if (translatedDoc && translatedDoc.body) {
+            // 保存原始 body 的引用
+            const originalBody = document.body;
+            
+            // 尝试更新页面标题（如果翻译结果中有标题）
+            if (translatedDoc.title && translatedDoc.title !== document.title) {
+              document.title = translatedDoc.title;
+              console.log('页面标题已更新:', document.title);
+            }
+            
+            // 保存当前滚动位置
+            const scrollX = window.scrollX;
+            const scrollY = window.scrollY;
+            
+            // 替换 body 内容
+            const newBodyContent = translatedDoc.body.innerHTML;
+            originalBody.innerHTML = newBodyContent;
+            
+            // 恢复滚动位置
+            window.scrollTo(scrollX, scrollY);
+            
+            console.log('=== 页面翻译完成 ===');
+            console.log('翻译后 body 内容长度:', newBodyContent.length);
+            showNotification('页面翻译完成！');
           } else {
-            failCount += batch.length;
-            console.error(`批次翻译最终失败:`, error);
+            throw new Error('翻译返回内容解析失败');
           }
+        } catch (e) {
+          console.error('替换页面内容失败:', e);
+          showNotification('翻译结果应用失败: ' + e.message, 'error');
         }
+      } else {
+        throw new Error('翻译返回内容为空');
       }
-
-      // 更新进度
-      const progress = Math.min(((i + batchSize) / textNodes.length) * 100, 100).toFixed(0);
-      showNotification(`翻译进度: ${progress}%${failCount > 0 ? ` (失败${failCount}条)` : ''}`);
-    }
-
-    // 启动动态内容监听
-    startDynamicContentObserver();
-    
-    if (failCount > 0) {
-      showNotification(`页面翻译完成！成功${successCount}条，失败${failCount}条`, 'warning');
     } else {
-      showNotification(`页面翻译完成！共翻译${successCount}条内容`);
+      const errorMsg = response.error || '翻译失败';
+      console.error('翻译API返回错误:', errorMsg);
+      showNotification(`翻译失败: ${errorMsg}`, 'error');
     }
   } catch (error) {
+    console.error('翻译过程出错:', error);
     showNotification(`翻译失败: ${error.message}`, 'error');
   } finally {
     isTranslating = false;
