@@ -55,6 +55,16 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
       }
     }
 
+    // 调试信息
+    console.log(`找到 ${textNodes.length} 个待翻译文本节点`);
+    showNotification(`找到 ${textNodes.length} 个文本节点，开始翻译...`);
+    
+    if (textNodes.length === 0) {
+      showNotification('页面没有可翻译的文本内容', 'warning');
+      isTranslating = false;
+      return;
+    }
+
     // 批量翻译
     const batchSize = 50;
     for (let i = 0; i < textNodes.length; i += batchSize) {
@@ -73,9 +83,12 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
         });
 
         if (response.success) {
-          const translations = Array.isArray(response.data.translatedText) 
-            ? response.data.translatedText 
+          const translations = Array.isArray(response.data.translatedText)
+            ? response.data.translatedText
             : [response.data.translatedText];
+            
+          // 调试信息
+          console.log(`翻译批次 ${Math.floor(i/batchSize) + 1}: 收到 ${translations.length} 条翻译结果`);
           
           batch.forEach((item, index) => {
             if (!originalTexts.has(item.node)) {
@@ -301,8 +314,8 @@ function showNotification(message, type = 'info') {
   const notification = document.createElement('div');
   notification.id = 'libretranslate-notification';
   
-  const bgColor = type === 'error' ? '#fce8e6' : '#e6f4ea';
-  const textColor = type === 'error' ? '#c5221f' : '#137333';
+  const bgColor = type === 'error' ? '#fce8e6' : type === 'warning' ? '#fff8e1' : '#e6f4ea';
+  const textColor = type === 'error' ? '#c5221f' : type === 'warning' ? '#f57c00' : '#137333';
   
   notification.style.cssText = `
     position: fixed;
@@ -319,6 +332,14 @@ function showNotification(message, type = 'info') {
     max-width: 300px;
     user-select: none;
   `;
+
+  // 适配暗色主题和警告类型
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    if (type === 'warning') {
+      notification.style.background = '#4a3f1f';
+      notification.style.color = '#ffd54f';
+    }
+  }
 
   // 适配暗色主题
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
