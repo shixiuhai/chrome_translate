@@ -4,7 +4,7 @@ let isTranslating = false;
 let currentTranslationTarget = 'zh-Hans';
 let translationObserver = null;
 
-// 改进的页面翻译函数 - 使用HTML格式一次性翻译整个页面
+// 页面翻译函数 - 使用HTML格式翻译body内容
 async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   if (isTranslating) {
     showNotification('正在翻译中，请稍候...');
@@ -13,77 +13,62 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
 
   isTranslating = true;
   currentTranslationTarget = target;
-  showNotification('开始翻译页面...');
+  showNotification('正在翻译页面，请稍候...', 'info');
 
-  console.log('=== 开始页面翻译 (HTML格式) ===');
+  console.log('=== 开始页面翻译 (HTML格式-body) ===');
   console.log('源语言:', source, '目标语言:', target);
 
   try {
-    // 保存页面原始HTML用于还原
-    const originalHtml = document.documentElement.outerHTML;
-    originalTexts.set(document.documentElement, { text: originalHtml, isFullPage: true });
+    // 保存原始body HTML用于还原
+    const originalBodyHtml = document.body.innerHTML;
+    originalTexts.set(document.body, { text: originalBodyHtml, isHTML: true });
     
-    // 获取整个页面的HTML内容
-    const pageHtml = document.documentElement.outerHTML;
-    console.log('页面HTML长度:', pageHtml.length);
+    // 只获取body的innerHTML
+    const bodyHtml = document.body.innerHTML;
+    console.log('body HTML长度:', bodyHtml.length);
     
-    if (pageHtml.length > 100000) {
-      showNotification('页面内容过大，将分批翻译...', 'warning');
+    // 检查内容大小
+    if (bodyHtml.length > 500000) {
+      showNotification('页面内容过大，请耐心等待...', 'warning');
     }
+    
+    // 显示翻译中状态
+    showNotification('正在翻译页面...');
     
     // 发送翻译请求 - 使用HTML格式
     const response = await chrome.runtime.sendMessage({
       action: 'translate',
       data: {
-        q: pageHtml,
+        q: bodyHtml,
         source,
         target,
         format: 'html'
-      }
+      },
+      timeout: 60000 // 60秒超时，用于大页面翻译
     });
 
     if (response.success && response.data && response.data.translatedText) {
       const translatedHtml = response.data.translatedText;
+      
       console.log('翻译结果长度:', translatedHtml.length);
       console.log('翻译结果前200字符:', translatedHtml.substring(0, 200));
       
       // 检查返回的是否是有效的HTML
       if (translatedHtml && translatedHtml.length > 0) {
         try {
-          // 使用 DOMParser 解析翻译后的HTML
-          const parser = new DOMParser();
-          const translatedDoc = parser.parseFromString(translatedHtml, 'text/html');
+          // 保存当前滚动位置
+          const scrollY = window.scrollY;
           
-          // 检查解析是否成功
-          if (translatedDoc && translatedDoc.body) {
-            // 保存原始 body 的引用
-            const originalBody = document.body;
-            
-            // 尝试更新页面标题（如果翻译结果中有标题）
-            if (translatedDoc.title && translatedDoc.title !== document.title) {
-              document.title = translatedDoc.title;
-              console.log('页面标题已更新:', document.title);
-            }
-            
-            // 保存当前滚动位置
-            const scrollX = window.scrollX;
-            const scrollY = window.scrollY;
-            
-            // 替换 body 内容
-            const newBodyContent = translatedDoc.body.innerHTML;
-            originalBody.innerHTML = newBodyContent;
-            
-            // 恢复滚动位置
-            window.scrollTo(scrollX, scrollY);
-            
-            console.log('=== 页面翻译完成 ===');
-            console.log('翻译后 body 内容长度:', newBodyContent.length);
-            showNotification('页面翻译完成！');
-          } else {
-            throw new Error('翻译返回内容解析失败');
-          }
+          // 直接替换body的innerHTML
+          document.body.innerHTML = translatedHtml;
+          
+          // 恢复滚动位置
+          window.scrollTo(0, scrollY);
+          
+          console.log('=== 页面翻译完成 ===');
+          showNotification('页面翻译完成！');
         } catch (e) {
-          console.error('替换页面内容失败:', e);
+          console.error('替换body内容失败:', e);
           showNotification('翻译结果应用失败: ' + e.message, 'error');
         }
       } else {
