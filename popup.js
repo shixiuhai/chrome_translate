@@ -275,22 +275,33 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // 如果内容脚本没有响应，再尝试使用 scripting API
-      const result = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => window.getSelection().toString()
-      });
+      try {
+        const result = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => window.getSelection().toString()
+        });
 
-      if (result && result[0] && result[0].result) {
-        sourceTextArea.value = result[0].result;
-        // 自动翻译（仅当源文本和目标语言不同时）
-        setTimeout(() => {
-          if (sourceLangSelect.value !== targetLangSelect.value) {
-            translateText();
-          }
-        }, 100);
+        if (result && result[0] && result[0].result) {
+          sourceTextArea.value = result[0].result;
+          // 自动翻译（仅当源文本和目标语言不同时）
+          setTimeout(() => {
+            if (sourceLangSelect.value !== targetLangSelect.value) {
+              translateText();
+            }
+          }, 100);
+        }
+      } catch (scriptError) {
+        // 静默处理 scripting API 的权限错误，这些错误在特殊页面上是正常的
+        // 只在调试模式下输出日志，不显示给用户
+        if (scriptError.message && !scriptError.message.includes('Cannot access contents of the page')) {
+          console.error('获取选中文本失败 (scripting):', scriptError);
+        }
       }
     } catch (error) {
-      console.error('获取选中文本失败:', error);
+      // 外层错误处理，同样静默处理权限相关错误
+      if (error.message && !error.message.includes('Cannot access contents of the page')) {
+        console.error('获取选中文本失败:', error);
+      }
     }
   }
 
