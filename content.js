@@ -4,13 +4,13 @@ let isTranslating = false;
 let currentTranslationTarget = 'zh-Hans';
 let translationObserver = null;
 
-// 翻译配置
+// 翻译配置 - 优化以提高成功率
 const TRANSLATION_CONFIG = {
-  maxCharsPerBatch: 4000,      // 每批次最大字符数
-  maxNodesPerBatch: 30,        // 每批次最大节点数
-  concurrency: 4,              // 并发翻译批次数
-  retryTimes: 2,                // 失败重试次数
-  retryDelay: 1000              // 重试延迟（毫秒）
+  maxCharsPerBatch: 3000,      // 每批次最大字符数（减少以降低服务器压力）
+  maxNodesPerBatch: 20,        // 每批次最大节点数（减少以提高成功率）
+  concurrency: 2,              // 并发翻译批次数（降低以减少超时）
+  retryTimes: 2,               // 失败重试次数
+  retryDelay: 1500             // 重试延迟（毫秒）
 };
 
 // 进度条元素
@@ -232,12 +232,20 @@ function hideProgress() {
 }
 
 // 翻译单个批次 - 使用 HTML 格式批量翻译
-async function translateBatch(batch, source, target, config) {
+async function translateBatch(batch, source, target, config, batchIndex, totalBatches) {
   let retries = 0;
   let lastError = null;
 
   while (retries <= config.retryTimes) {
     try {
+      // 更新进度条显示重试状态
+      if (retries > 0 && progressOverlay) {
+        const progressTitle = progressOverlay.querySelector('#progress-title');
+        if (progressTitle) {
+          progressTitle.textContent = `正在重试... (${retries}/${config.retryTimes})`;
+        }
+      }
+      
       // 将文本用 <p> 标签拼接成 HTML 字符串
       const htmlContent = batch.map(node => '<p>' + escapeHtmlForApi(node.textContent.trim()) + '</p>').join('');
       
@@ -274,7 +282,6 @@ async function translateBatch(batch, source, target, config) {
       
       // 验证返回的翻译数量是否与原文本节点数量一致
       if (translations.length !== batch.length) {
-        console.warn(`翻译数量不匹配：原文本节点 ${batch.length} 个，翻译结果 ${translations.length} 个`);
         // 如果数量不一致，按索引对应，超出部分忽略
       }
       
@@ -352,7 +359,7 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
     const controller = new ConcurrencyController(TRANSLATION_CONFIG.concurrency);
     const results = await Promise.all(batches.map((batch, index) =>
       controller.run(async () => {
-        const result = await translateBatch(batch, source, target, TRANSLATION_CONFIG);
+        const result = await translateBatch(batch, source, target, TRANSLATION_CONFIG, index, batches.length);
         
         if (result.success) {
           translationProgress.completed++;
