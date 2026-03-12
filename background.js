@@ -1,7 +1,7 @@
 // 背景服务 Worker
 chrome.runtime.onInstalled.addListener(() => {
   // 初始化默认配置
-  chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target', 'autoTranslateExcludedSites'], (result) => {
+  chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], (result) => {
     const defaults = {
       apiUrl: 'https://libretranslate.de',
       apiKey: '',
@@ -9,13 +9,7 @@ chrome.runtime.onInstalled.addListener(() => {
       defaultTarget: 'zh-Hans',
       autoTranslate: false,
       autoTranslateLanguages: ['en'],
-      autoTranslateExcludedSites: [],
-      // 快捷键 1 默认配置：翻译选中文本
-      shortcut1Action: 'translateSelection',
-      shortcut1Target: 'zh-Hans',
-      // 快捷键 2 默认配置：翻译整页
-      shortcut2Action: 'translatePage',
-      shortcut2Target: 'zh-Hans'
+      autoTranslateExcludedSites: []
     };
     
     chrome.storage.local.set({
@@ -113,7 +107,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
       
     case 'getSettings':
-      chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target', 'autoTranslateExcludedSites'], (result) => {
+      chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], (result) => {
         sendResponse({ success: true, data: result });
       });
       return true;
@@ -190,6 +184,6 @@ async function getSupportedLanguages() {
 // 获取存储的设置
 function getSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target', 'autoTranslateExcludedSites'], resolve);
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], resolve);
   });
 }
