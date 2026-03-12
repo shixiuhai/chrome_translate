@@ -180,10 +180,105 @@
       font-size: 12px;
       cursor: pointer;
       transition: all 0.2s;
-      color: var(--text-color);
     }
     .action-btn:hover {
       background-color: var(--secondary-button-hover);
+    }
+    .loading {
+      text-align: center;
+      padding: 10px;
+      color: var(--text-secondary);
+      display: none;
+      font-size: 14px;
+    }
+    .error {
+      background-color: var(--error-bg);
+      color: var(--error-color);
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .result-area {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* 开关样式 */
+    .toggle-group {
+      background: var(--input-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+      transition: all 0.2s ease;
+      margin: 8px 0;
+    }
+
+    .toggle-group:hover {
+      border-color: var(--button-bg);
+    }
+
+    .toggle-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .toggle-text {
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 22px;
+    }
+
+    .toggle-input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .3s;
+      border-radius: 22px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    .toggle-input:checked + .toggle-slider {
+      background-color: var(--button-bg);
+    }
+
+    .toggle-input:focus + .toggle-slider {
+      box-shadow: 0 0 1px var(--button-bg);
+    }
+
+    .toggle-input:checked + .toggle-slider:before {
+      transform: translateX(22px);
     }
     .loading {
       text-align: center;
@@ -284,17 +379,23 @@
 
   <div class="result-area" id="resultArea"></div>
 
-  <div class="auto-translate-settings" style="margin: 12px 0; padding: 10px; background: var(--input-bg); border-radius: 4px; font-size: 13px;">
-    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-      <input type="checkbox" id="autoTranslate">
-      <span>启用自动翻译</span>
+  <div class="toggle-group">
+    <label class="toggle-label">
+      <span class="toggle-text">启用自动翻译</span>
+      <div class="toggle-switch">
+        <input type="checkbox" id="autoTranslate" class="toggle-input">
+        <span class="toggle-slider"></span>
+      </div>
     </label>
   </div>
 
-  <div class="site-settings" style="margin: 12px 0; padding: 10px; background: var(--input-bg); border-radius: 4px; font-size: 13px;">
-    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-      <input type="checkbox" id="excludeSite">
-      <span>排除当前网站，不自动翻译</span>
+  <div class="toggle-group">
+    <label class="toggle-label">
+      <span class="toggle-text">排除当前网站</span>
+      <div class="toggle-switch">
+        <input type="checkbox" id="excludeSite" class="toggle-input">
+        <span class="toggle-slider"></span>
+      </div>
     </label>
   </div>
 

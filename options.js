@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const testBtn = document.getElementById('testBtn');
   const statusDiv = document.getElementById('status');
   const loadingDiv = document.getElementById('loading');
-  const autoTranslateCheckbox = document.getElementById('autoTranslate');
   const autoTranslateLanguagesInput = document.getElementById('autoTranslateLanguages');
   const autoTranslateExcludedSitesInput = document.getElementById('autoTranslateExcludedSites');
 
@@ -23,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 加载设置
   function loadSettings() {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], (result) => {
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], (result) => {
       if (result.apiUrl) {
         apiUrlInput.value = result.apiUrl;
         loadLanguages(result.apiUrl, result.apiKey).then(() => {
@@ -44,7 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
         apiKeyInput.value = result.apiKey;
       }
 
-      autoTranslateCheckbox.checked = result.autoTranslate || false;
       autoTranslateLanguagesInput.value = result.autoTranslateLanguages ? result.autoTranslateLanguages.join(',') : '';
       autoTranslateExcludedSitesInput.value = result.autoTranslateExcludedSites ? result.autoTranslateExcludedSites.join(',') : '';
     });
@@ -95,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiKey = apiKeyInput.value.trim();
     const defaultSource = defaultSourceSelect.value;
     const defaultTarget = defaultTargetSelect.value;
-    const autoTranslate = autoTranslateCheckbox.checked;
     const autoTranslateLanguages = autoTranslateLanguagesInput.value
       .split(',')
       .map(lang => lang.trim())
@@ -115,7 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
       apiKey,
       defaultSource,
       defaultTarget,
-      autoTranslate,
       autoTranslateLanguages,
       autoTranslateExcludedSites
     }, () => {
