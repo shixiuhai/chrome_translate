@@ -287,13 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 获取设置
-  function getSettings() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget'], resolve);
-    });
-  }
-
   // 显示错误
   function showError(message) {
     errorDiv.textContent = message;
@@ -362,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 更新getSettings函数，获取所有配置项
+  // 获取设置 - 统一的设置获取函数
   function getSettings() {
     return new Promise((resolve) => {
       chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], resolve);

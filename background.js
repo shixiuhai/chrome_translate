@@ -136,7 +136,7 @@ async function handleTranslation({ q, source, target, format = 'text' }) {
     const response = await fetch(`${settings.apiUrl.replace(/\/$/, '')}/translate`, {
       method: 'POST',
       body: formData,
-      signal: AbortSignal.timeout(30000) // 30秒超时
+      signal: AbortSignal.timeout(15000) // 15秒超时（分批翻译每批超时时间）
     });
 
     if (!response.ok) {
