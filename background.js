@@ -3,7 +3,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // 初始化默认配置
   chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], (result) => {
     const defaults = {
-      apiUrl: 'https://libretranslate.de',
+      apiUrl: 'https://libretranslate.com/translate',
       apiKey: '',
       defaultSource: 'auto',
       defaultTarget: 'zh-Hans',
@@ -207,12 +207,67 @@ async function detectLanguage({ q }) {
   }
 }
 
+// 备用语言列表（当 API 不可用时使用）
+const FALLBACK_LANGUAGES = [
+  { code: "zh-Hans", name: "中文（简体）" },
+  { code: "zh-Hant", name: "中文（繁体）" },
+  { code: "ar", name: "阿拉伯语" },
+  { code: "az", name: "阿塞拜疆语" },
+  { code: "bg", name: "保加利亚语" },
+  { code: "bn", name: "孟加拉语" },
+  { code: "ca", name: "加泰罗尼亚语" },
+  { code: "cs", name: "捷克语" },
+  { code: "da", name: "丹麦语" },
+  { code: "de", name: "德语" },
+  { code: "el", name: "希腊语" },
+  { code: "en", name: "英语" },
+  { code: "eo", name: "世界语" },
+  { code: "es", name: "西班牙语" },
+  { code: "et", name: "爱沙尼亚语" },
+  { code: "eu", name: "巴斯克语" },
+  { code: "fa", name: "波斯语" },
+  { code: "fi", name: "芬兰语" },
+  { code: "fr", name: "法语" },
+  { code: "ga", name: "爱尔兰语" },
+  { code: "gl", name: "加利西亚语" },
+  { code: "he", name: "希伯来语" },
+  { code: "hi", name: "印地语" },
+  { code: "hu", name: "匈牙利语" },
+  { code: "id", name: "印度尼西亚语" },
+  { code: "it", name: "意大利语" },
+  { code: "ja", name: "日语" },
+  { code: "ko", name: "韩语" },
+  { code: "ky", name: "吉尔吉斯语" },
+  { code: "lt", name: "立陶宛语" },
+  { code: "lv", name: "拉脱维亚语" },
+  { code: "ms", name: "马来语" },
+  { code: "nb", name: "挪威语" },
+  { code: "nl", name: "荷兰语" },
+  { code: "pl", name: "波兰语" },
+  { code: "pt-BR", name: "葡萄牙语（巴西）" },
+  { code: "pt", name: "葡萄牙语" },
+  { code: "ro", name: "罗马尼亚语" },
+  { code: "ru", name: "俄语" },
+  { code: "sk", name: "斯洛伐克语" },
+  { code: "sl", name: "斯洛文尼亚语" },
+  { code: "sq", name: "阿尔巴尼亚语" },
+  { code: "sr", name: "塞尔维亚语" },
+  { code: "sv", name: "瑞典语" },
+  { code: "th", name: "泰语" },
+  { code: "tl", name: "他加禄语" },
+  { code: "tr", name: "土耳其语" },
+  { code: "uk", name: "乌克兰语" },
+  { code: "ur", name: "乌尔都语" },
+  { code: "vi", name: "越南语" }
+];
+
 // 获取支持的语言列表
 async function getSupportedLanguages() {
   const settings = await getSettings();
   
   if (!settings.apiUrl) {
-    throw new Error('请先配置翻译 API 地址');
+    // 没有 API 地址时返回备用语言列表
+    return FALLBACK_LANGUAGES;
   }
 
   try {
@@ -221,13 +276,17 @@ async function getSupportedLanguages() {
     });
     
     if (!response.ok) {
-      throw new Error(`获取语言列表失败：${response.status}`);
+      // API 请求失败时返回备用语言列表
+      console.warn('API 语言列表获取失败，使用备用语言列表');
+      return FALLBACK_LANGUAGES;
     }
 
     const languages = await response.json();
     return languages;
   } catch (error) {
-    throw new Error(`获取语言列表失败：${error.message}`);
+    // 发生错误时返回备用语言列表
+    console.warn('获取语言列表失败:', error.message, '使用备用语言列表');
+    return FALLBACK_LANGUAGES;
   }
 }
 
