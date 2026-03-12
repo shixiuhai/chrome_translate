@@ -2,9 +2,9 @@
 let originalTexts = new Map();
 let isTranslating = false;
 let currentTranslationTarget = 'zh-Hans';
+let translationObserver = null;
 
-
-// 翻译整个页面
+// 改进的文本节点收集和翻译函数
 async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   if (isTranslating) {
     showNotification('正在翻译中，请稍候...');
@@ -12,6 +12,7 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   }
 
   isTranslating = true;
+  currentTranslationTarget = target;
   showNotification('开始翻译页面...');
 
   try {
@@ -27,31 +28,38 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
           if (!parent) return NodeFilter.FILTER_REJECT;
           
           const tagName = parent.tagName.toUpperCase();
-          if (
-            tagName === 'SCRIPT' ||
-            tagName === 'STYLE' ||
-            tagName === 'NOSCRIPT' ||
-            tagName === 'IFRAME' ||
-            tagName === 'INPUT' ||
-            tagName === 'TEXTAREA' ||
-            tagName === 'BUTTON' ||
-            tagName === 'SELECT' ||
-            parent.isContentEditable ||
-            node.textContent.trim().length < 1 || // 调整为长度小于1才跳过，避免跳过短文本
-            /^\d+$/.test(node.textContent.trim()) // 跳过纯数字
-          ) {
+          
+          // 扩展排除标签列表
+          const excludedTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'INPUT', 'TEXTAREA', 'CODE', 'PRE'];
+          
+          if (excludedTags.includes(tagName) || parent.isContentEditable) {
             return NodeFilter.FILTER_REJECT;
           }
+          
+          const text = node.textContent.trim();
+          
+          // 调整长度判断，允许翻译2-50个字符的文本（避免过短或过长的文本）
+          if (text.length < 2 || text.length > 5000) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
+          // 改进纯数字判断（允许带小数点、逗号分隔的数字）
+          if (/^\d+([,.]\d+)*$/.test(text)) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
           return NodeFilter.FILTER_ACCEPT;
         }
       }
     );
 
     let node;
+    let processedCount = 0;
     while (node = walker.nextNode()) {
       const text = node.textContent.trim();
-      if (text) {
+      if (text && text.length >= 2 && text.length <= 5000) {
         textNodes.push({ node, text });
+        processedCount++;
       }
     }
 
@@ -65,54 +73,120 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
       return;
     }
 
-    // 批量翻译
-    const batchSize = 50;
+    // 批量翻译，增加重试机制
+    const batchSize = 30;
+    const maxRetries = 2;
+    let successCount = 0;
+    let failCount = 0;
+    
     for (let i = 0; i < textNodes.length; i += batchSize) {
       const batch = textNodes.slice(i, i + batchSize);
       const texts = batch.map(item => item.text);
       
-      try {
-        const response = await chrome.runtime.sendMessage({
-          action: 'translate',
-          data: {
-            q: texts,
-            source,
-            target,
-            format: 'html'
-          }
-        });
-
-        if (response.success) {
-          const translations = Array.isArray(response.data.translatedText)
-            ? response.data.translatedText
-            : [response.data.translatedText];
-            
-          // 调试信息
-          console.log(`翻译批次 ${Math.floor(i/batchSize) + 1}: 收到 ${translations.length} 条翻译结果`);
-          
-          batch.forEach((item, index) => {
-            if (!originalTexts.has(item.node)) {
-              originalTexts.set(item.node, item.text);
-            }
-            if (translations[index]) {
-              // 保留原文本的前后空白字符
-              const originalNodeText = item.node.textContent;
-              const leadingWhitespace = originalNodeText.match(/^\s*/)[0];
-              const trailingWhitespace = originalNodeText.match(/\s*$/)[0];
-              item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
+      let retries = 0;
+      let batchSuccess = false;
+      
+      while (retries < maxRetries && !batchSuccess) {
+        try {
+          const response = await chrome.runtime.sendMessage({
+            action: 'translate',
+            data: {
+              q: texts,
+              source,
+              target,
+              format: 'html'
             }
           });
+
+          if (response.success) {
+            const translations = Array.isArray(response.data.translatedText)
+              ? response.data.translatedText
+              : [response.data.translatedText];
+              
+            // 调试信息
+            console.log(`翻译批次 ${Math.floor(i/batchSize) + 1}: 收到 ${translations.length} 条翻译结果`);
+            
+            batch.forEach((item, index) => {
+              if (translations[index]) {
+                // 检查是否需要存储原始文本
+                if (!originalTexts.has(item.node)) {
+                  originalTexts.set(item.node, {
+                    text: item.text,
+                    isHTML: false
+                  });
+                }
+                
+                try {
+                  const originalNodeText = item.node.textContent;
+                  const leadingWhitespace = originalNodeText.match(/^\s*/)[0];
+                  const trailingWhitespace = originalNodeText.match(/\s*$/)[0];
+                  
+                  // 检查翻译结果是否包含HTML标签
+                  if (/<[a-z][\s\S]*>/i.test(translations[index])) {
+                    // 尝试使用innerHTML（仅当父元素允许时）
+                    const parent = item.node.parentElement;
+                    if (parent && parent.tagName !== 'SCRIPT' && parent.tagName !== 'STYLE') {
+                      try {
+                        // 创建一个临时元素来安全解析HTML
+                        const temp = document.createElement('div');
+                        temp.innerHTML = leadingWhitespace + translations[index] + trailingWhitespace;
+                        
+                        // 检查是否包含危险内容
+                        const hasScript = temp.querySelector('script,style,iframe,object,embed');
+                        if (!hasScript) {
+                          item.node.textContent = temp.textContent;
+                        } else {
+                          item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
+                        }
+                      } catch (e) {
+                        item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
+                      }
+                    } else {
+                      item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
+                    }
+                  } else {
+                    // 普通文本替换
+                    item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
+                  }
+                  successCount++;
+                } catch (e) {
+                  console.error('更新文本节点失败:', e);
+                  failCount++;
+                }
+              }
+            });
+            
+            batchSuccess = true;
+          } else {
+            throw new Error(response.error || '翻译失败');
+          }
+        } catch (error) {
+          retries++;
+          console.error(`批次翻译失败 (尝试 ${retries}/${maxRetries}):`, error);
+          
+          if (retries < maxRetries) {
+            // 等待后重试
+            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          } else {
+            failCount += batch.length;
+            console.error(`批次翻译最终失败:`, error);
+          }
         }
-      } catch (error) {
-        console.error('批量翻译失败:', error);
-        showNotification(`批量翻译失败: ${error.message}`, 'error');
       }
 
       // 更新进度
-      showNotification(`翻译进度: ${Math.min(((i + batchSize) / textNodes.length) * 100, 100).toFixed(0)}%`);
+      const progress = Math.min(((i + batchSize) / textNodes.length) * 100, 100).toFixed(0);
+      showNotification(`翻译进度: ${progress}%${failCount > 0 ? ` (失败${failCount}条)` : ''}`);
     }
 
-    showNotification('页面翻译完成！');
+    // 启动动态内容监听
+    startDynamicContentObserver();
+    
+    if (failCount > 0) {
+      showNotification(`页面翻译完成！成功${successCount}条，失败${failCount}条`, 'warning');
+    } else {
+      showNotification(`页面翻译完成！共翻译${successCount}条内容`);
+    }
   } catch (error) {
     showNotification(`翻译失败: ${error.message}`, 'error');
   } finally {
@@ -120,7 +194,7 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   }
 }
 
-// 还原页面到原始状态
+// 还原页面到原始状态 - 改进支持
 function restoreOriginalPage() {
   if (isTranslating) {
     showNotification('正在翻译中，无法还原');
@@ -133,15 +207,75 @@ function restoreOriginalPage() {
   }
 
   try {
-    originalTexts.forEach((originalText, node) => {
+    originalTexts.forEach((data, node) => {
       if (node.parentNode) { // 确保节点仍然存在
+        // 支持对象格式 {text, isHTML} 和字符串格式
+        const originalText = typeof data === 'object' ? data.text : data;
         node.textContent = originalText;
       }
     });
     originalTexts.clear();
+    
+    // 停止动态内容监听
+    if (translationObserver) {
+      translationObserver.disconnect();
+      translationObserver = null;
+    }
+    
     showNotification('页面已还原到原始状态');
   } catch (error) {
     showNotification(`还原失败: ${error.message}`, 'error');
+  }
+}
+
+// 监听动态内容变化，翻译新加载的内容
+function startDynamicContentObserver() {
+  // 如果已有observer，先断开
+  if (translationObserver) {
+    translationObserver.disconnect();
+  }
+  
+  translationObserver = new MutationObserver((mutations) => {
+    // 忽略翻译过程中的变化
+    if (isTranslating || originalTexts.size === 0) return;
+    
+    let hasNewTextContent = false;
+    
+    mutations.forEach(mutation => {
+      if (mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach(node => {
+          // 检查是否是文本节点或有文本内容的元素
+          if (node.nodeType === Node.TEXT_NODE) {
+            if (node.textContent.trim().length >= 2) {
+              hasNewTextContent = true;
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const text = node.textContent?.trim();
+            if (text && text.length >= 2) {
+              hasNewTextContent = true;
+            }
+          }
+        });
+      }
+    });
+    
+    if (hasNewTextContent) {
+      // 延迟一点翻译，确保内容已完全加载
+      setTimeout(() => {
+        // 仅提示用户有动态内容，不自动翻译（避免干扰用户）
+        console.log('检测到页面有新内容加载');
+      }, 500);
+    }
+  });
+  
+  // 开始监听body的变化
+  try {
+    translationObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  } catch (e) {
+    console.error('启动动态内容监听失败:', e);
   }
 }
 
@@ -178,7 +312,7 @@ async function translateSelection(source = 'auto', target = 'zh-Hans') {
   }
 }
 
-// 显示翻译弹窗
+// 显示翻译弹窗 - 修复定位和显示问题
 function showTranslationPopup(selection, translatedText, source = 'auto', currentTarget = 'zh-Hans') {
   // 移除之前的弹窗
   const oldPopup = document.getElementById('libretranslate-popup');
@@ -186,66 +320,91 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
     oldPopup.remove();
   }
 
-  const range = selection.getRangeAt(0);
-  const rect = range.getBoundingClientRect();
+  // 获取选区信息
+  let rect;
+  try {
+    const range = selection.getRangeAt(0);
+    rect = range.getBoundingClientRect();
+  } catch (e) {
+    console.error('获取选区失败:', e);
+    return;
+  }
+
+  // 如果选区无效，使用鼠标位置（如果有）
+  if (!rect || rect.width === 0 || rect.height === 0) {
+    console.warn('选区无效，跳过显示弹窗');
+    return;
+  }
 
   const popup = document.createElement('div');
   popup.id = 'libretranslate-popup';
   
-  // 计算弹窗位置，确保在视口内
+  // 计算弹窗位置，确保在视口内 - 使用正确的fixed定位计算
   const popupMaxWidth = 400;
   const popupMaxHeight = 300;
   const margin = 10;
   
-  let top = rect.bottom + window.scrollY + margin;
-  let left = rect.left + window.scrollX;
+  // position: fixed 不需要使用 scrollX/scrollY
+  let top = rect.bottom + margin;
+  let left = rect.left;
   
   // 调整水平位置，避免超出右边界
-  if (left + popupMaxWidth > window.innerWidth + window.scrollX) {
-    left = Math.max(margin, window.innerWidth + window.scrollX - popupMaxWidth - margin);
+  if (left + popupMaxWidth > window.innerWidth) {
+    left = Math.max(margin, window.innerWidth - popupMaxWidth - margin);
   }
   
   // 调整垂直位置，如果下方空间不足则显示在选中文本上方
-  if (top + popupMaxHeight > window.innerHeight + window.scrollY) {
-    top = Math.max(margin, rect.top + window.scrollY - popupMaxHeight - margin);
+  if (top + popupMaxHeight > window.innerHeight) {
+    // 尝试显示在文本上方
+    const aboveTop = rect.top - popupMaxHeight - margin;
+    if (aboveTop > 0) {
+      top = aboveTop;
+    } else {
+      // 如果上方也不够，显示在视口顶部
+      top = margin;
+    }
   }
+  
+  // 确保不超出左边界
+  left = Math.max(margin, left);
+
+  // 检查是否为暗色主题
+  const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const bgColor = isDarkMode ? '#1e1e1e' : 'white';
+  const textColor = isDarkMode ? '#ffffff' : '#333333';
+  const borderColor = isDarkMode ? '#3e3e3e' : '#ddd';
+  const btnBgColor = isDarkMode ? '#3e3e3e' : '#f0f0f0';
+  const btnTextColor = isDarkMode ? '#ffffff' : '#333333';
 
   popup.style.cssText = `
     position: fixed;
     top: ${top}px;
     left: ${left}px;
-    background: white;
-    border: 1px solid #ddd;
+    background: ${bgColor};
+    border: 1px solid ${borderColor};
     border-radius: 8px;
     padding: 12px 16px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    z-index: 999999;
+    z-index: 2147483647;
     max-width: ${popupMaxWidth}px;
     max-height: ${popupMaxHeight}px;
     overflow-y: auto;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 14px;
     line-height: 1.5;
-    color: #333;
+    color: ${textColor};
     user-select: text;
   `;
-
-  // 适配暗色主题
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    popup.style.background = '#1e1e1e';
-    popup.style.borderColor = '#3e3e3e';
-    popup.style.color = '#fff';
-  }
 
   popup.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <strong style="color: #4285f4;">翻译结果</strong>
-      <button id="libretranslate-close" style="background: none; border: none; font-size: 16px; cursor: pointer; padding: 0 4px; color: #999;">×</button>
+      <button id="libretranslate-close" style="background: ${btnBgColor}; border: none; font-size: 16px; cursor: pointer; padding: 0 4px; color: ${btnTextColor}; border-radius: 4px;">×</button>
     </div>
-    <div style="white-space: pre-wrap; word-wrap: break-word;">${translatedText}</div>
-    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee; display: flex; gap: 8px; flex-wrap: wrap;">
-      <button id="libretranslate-copy" style="background: #f0f0f0; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer;">复制</button>
-      <select id="libretranslate-switch-lang" style="background: #f0f0f0; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer;">
+    <div style="white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(translatedText)}</div>
+    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid ${borderColor}; display: flex; gap: 8px; flex-wrap: wrap;">
+      <button id="libretranslate-copy" style="background: ${btnBgColor}; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: ${btnTextColor};">复制</button>
+      <select id="libretranslate-switch-lang" style="background: ${btnBgColor}; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: ${btnTextColor};">
         <option value="">切换语言</option>
         <option value="en">英语</option>
         <option value="zh-Hans">中文（简体）</option>
@@ -276,7 +435,7 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
         copyBtn.textContent = '复制';
       }, 2000);
     } catch (error) {
-      alert('复制失败');
+      showNotification('复制失败', 'error');
     }
   });
 
@@ -303,7 +462,9 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
       if (response.success) {
         // 更新翻译结果
         const resultDiv = popup.querySelector('div[style*="white-space: pre-wrap"]');
-        resultDiv.textContent = response.data.translatedText;
+        if (resultDiv) {
+          resultDiv.textContent = response.data.translatedText;
+        }
         showNotification('翻译完成');
       } else {
         showNotification(`翻译失败: ${response.error}`, 'error');
@@ -316,15 +477,36 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
     langSelect.value = '';
   });
 
-  // 点击外部关闭
-  document.addEventListener('click', (e) => {
-    if (!popup.contains(e.target)) {
+  // 延迟绑定点击外部关闭事件，避免弹窗刚创建就被关闭
+  // 使用 setTimeout 确保点击事件不会立即触发
+  setTimeout(() => {
+    const clickHandler = (e) => {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', clickHandler);
+      }
+    };
+    document.addEventListener('click', clickHandler, { once: true });
+  }, 100);
+  
+  // 添加ESC键关闭功能
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
       popup.remove();
+      document.removeEventListener('keydown', escHandler);
     }
-  }, { once: true });
+  };
+  document.addEventListener('keydown', escHandler, { once: true });
 }
 
-// 显示通知
+// HTML转义函数，防止XSS
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// 显示通知 - 修复z-index和暗色主题
 function showNotification(message, type = 'info') {
   // 移除之前的通知
   const oldNotification = document.getElementById('libretranslate-notification');
@@ -332,11 +514,20 @@ function showNotification(message, type = 'info') {
     oldNotification.remove();
   }
 
+  // 检查是否为暗色主题
+  const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
   const notification = document.createElement('div');
   notification.id = 'libretranslate-notification';
   
-  const bgColor = type === 'error' ? '#fce8e6' : type === 'warning' ? '#fff8e1' : '#e6f4ea';
-  const textColor = type === 'error' ? '#c5221f' : type === 'warning' ? '#f57c00' : '#137333';
+  let bgColor, textColor;
+  if (isDarkMode) {
+    bgColor = type === 'error' ? '#4a1f1f' : type === 'warning' ? '#4a3f1f' : '#1f4a2f';
+    textColor = type === 'error' ? '#ff8a8a' : type === 'warning' ? '#ffd54f' : '#8affa8';
+  } else {
+    bgColor = type === 'error' ? '#fce8e6' : type === 'warning' ? '#fff8e1' : '#e6f4ea';
+    textColor = type === 'error' ? '#c5221f' : type === 'warning' ? '#f57c00' : '#137333';
+  }
   
   notification.style.cssText = `
     position: fixed;
@@ -347,26 +538,12 @@ function showNotification(message, type = 'info') {
     padding: 12px 20px;
     border-radius: 4px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    z-index: 999999;
+    z-index: 2147483646;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 14px;
     max-width: 300px;
     user-select: none;
   `;
-
-  // 适配暗色主题和警告类型
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    if (type === 'warning') {
-      notification.style.background = '#4a3f1f';
-      notification.style.color = '#ffd54f';
-    }
-  }
-
-  // 适配暗色主题
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    notification.style.background = type === 'error' ? '#4a1f1f' : '#1f4a2f';
-    notification.style.color = type === 'error' ? '#ff8a8a' : '#8affa8';
-  }
   
   notification.textContent = message;
   
