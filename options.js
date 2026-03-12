@@ -11,10 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const autoTranslateCheckbox = document.getElementById('autoTranslate');
   const autoTranslateLanguagesInput = document.getElementById('autoTranslateLanguages');
   const autoTranslateExcludedSitesInput = document.getElementById('autoTranslateExcludedSites');
-  const shortcut1ActionSelect = document.getElementById('shortcut1Action');
-  const shortcut1TargetSelect = document.getElementById('shortcut1Target');
-  const shortcut2ActionSelect = document.getElementById('shortcut2Action');
-  const shortcut2TargetSelect = document.getElementById('shortcut2Target');
 
   // 加载已保存的设置
   loadSettings();
@@ -27,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 加载设置
   function loadSettings() {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target'], (result) => {
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], (result) => {
       if (result.apiUrl) {
         apiUrlInput.value = result.apiUrl;
         loadLanguages(result.apiUrl, result.apiKey).then(() => {
@@ -36,13 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           if (result.defaultTarget) {
             defaultTargetSelect.value = result.defaultTarget;
-          }
-          // 设置快捷键目标语言选择
-          if (result.shortcut1Target) {
-            shortcut1TargetSelect.value = result.shortcut1Target;
-          }
-          if (result.shortcut2Target) {
-            shortcut2TargetSelect.value = result.shortcut2Target;
           }
         });
       } else {
@@ -58,14 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
       autoTranslateCheckbox.checked = result.autoTranslate || false;
       autoTranslateLanguagesInput.value = result.autoTranslateLanguages ? result.autoTranslateLanguages.join(',') : '';
       autoTranslateExcludedSitesInput.value = result.autoTranslateExcludedSites ? result.autoTranslateExcludedSites.join(',') : '';
-
-      // 加载快捷键配置
-      if (result.shortcut1Action) {
-        shortcut1ActionSelect.value = result.shortcut1Action;
-      }
-      if (result.shortcut2Action) {
-        shortcut2ActionSelect.value = result.shortcut2Action;
-      }
     });
   }
 
@@ -74,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       showLoading(true);
       const response = await fetch(`${apiUrl.replace(/\/$/, '')}/languages`, {
-        signal: AbortSignal.timeout(10000) // 10秒超时
+        signal: AbortSignal.timeout(10000) // 10 秒超时
       });
       
       if (!response.ok) {
@@ -86,8 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // 清空现有选项
       defaultSourceSelect.innerHTML = '<option value="auto">自动检测</option>';
       defaultTargetSelect.innerHTML = '';
-      shortcut1TargetSelect.innerHTML = '';
-      shortcut2TargetSelect.innerHTML = '';
       
       // 添加语言选项
       languages.forEach(lang => {
@@ -100,21 +79,11 @@ document.addEventListener('DOMContentLoaded', () => {
         option2.value = lang.code;
         option2.textContent = `${lang.name} (${lang.code})`;
         defaultTargetSelect.appendChild(option2);
-        
-        const option3 = document.createElement('option');
-        option3.value = lang.code;
-        option3.textContent = `${lang.name} (${lang.code})`;
-        shortcut1TargetSelect.appendChild(option3);
-        
-        const option4 = document.createElement('option');
-        option4.value = lang.code;
-        option4.textContent = `${lang.name} (${lang.code})`;
-        shortcut2TargetSelect.appendChild(option4);
       });
 
       showStatus('语言列表加载成功', 'success');
     } catch (error) {
-      showStatus(`加载语言列表失败: ${error.message}`, 'error');
+      showStatus(`加载语言列表失败：${error.message}`, 'error');
     } finally {
       showLoading(false);
     }
@@ -135,10 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
       .split(',')
       .map(site => site.trim())
       .filter(site => site);
-    const shortcut1Action = shortcut1ActionSelect.value;
-    const shortcut1Target = shortcut1TargetSelect.value;
-    const shortcut2Action = shortcut2ActionSelect.value;
-    const shortcut2Target = shortcut2TargetSelect.value;
 
     if (!apiUrl) {
       showStatus('请填写 API 地址', 'error');
@@ -152,11 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
       defaultTarget,
       autoTranslate,
       autoTranslateLanguages,
-      autoTranslateExcludedSites,
-      shortcut1Action,
-      shortcut1Target,
-      shortcut2Action,
-      shortcut2Target
+      autoTranslateExcludedSites
     }, () => {
       showStatus('设置保存成功', 'success');
       // 重新加载语言列表
@@ -178,11 +139,10 @@ document.addEventListener('DOMContentLoaded', () => {
       showLoading(true);
       
       // 测试健康检查接口
-      // 尝试健康检查接口，如不支持则跳过
       let healthResponse;
       try {
         healthResponse = await fetch(`${apiUrl.replace(/\/$/, '')}/health`, {
-          signal: AbortSignal.timeout(5000) // 5秒超时
+          signal: AbortSignal.timeout(5000) // 5 秒超时
         });
         if (healthResponse.ok) {
           const healthData = await healthResponse.json();
@@ -191,7 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       } catch (healthError) {
-        // 健康检查接口不存在或失败，不影响主要功能，继续测试翻译接口
         console.warn('健康检查接口不可用，跳过:', healthError.message);
       }
 
@@ -207,19 +166,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const translateResponse = await fetch(`${apiUrl.replace(/\/$/, '')}/translate`, {
         method: 'POST',
         body: formData,
-        signal: AbortSignal.timeout(10000) // 10秒超时
+        signal: AbortSignal.timeout(10000) // 10 秒超时
       });
 
       if (!translateResponse.ok) {
         const errorData = await translateResponse.json().catch(() => null);
-        throw new Error(errorData?.error || `翻译测试失败: ${translateResponse.status}`);
+        throw new Error(errorData?.error || `翻译测试失败：${translateResponse.status}`);
       }
 
       const translateData = await translateResponse.json();
-      showStatus(`连接测试成功！测试翻译结果: ${translateData.translatedText}`, 'success');
+      showStatus(`连接测试成功！测试翻译结果：${translateData.translatedText}`, 'success');
       
     } catch (error) {
-      showStatus(`连接测试失败: ${error.message}`, 'error');
+      showStatus(`连接测试失败：${error.message}`, 'error');
     } finally {
       showLoading(false);
     }
@@ -230,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     statusDiv.textContent = message;
     statusDiv.className = `status ${type}`;
     
-    // 3秒后自动隐藏成功消息
+    // 3 秒后自动隐藏成功消息
     if (type === 'success') {
       setTimeout(() => {
         statusDiv.style.display = 'none';

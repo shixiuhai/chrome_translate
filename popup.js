@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const translatePageBtn = document.getElementById('translatePageBtn');
   const restorePageBtn = document.getElementById('restorePageBtn');
   const copyBtn = document.getElementById('copyBtn');
+  const autoTranslateCheckbox = document.getElementById('autoTranslate');
   const excludeSiteCheckbox = document.getElementById('excludeSite');
   const loadingDiv = document.getElementById('loading');
   const errorDiv = document.getElementById('error');
@@ -37,6 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 获取选中文本
     getSelectedText();
+
+    // 初始化自动翻译开关状态
+    initAutoTranslateSwitch(settings);
 
     // 初始化排除网站开关状态
     initExcludeSiteSwitch(settings);
@@ -68,6 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // 复制按钮
     copyBtn.addEventListener('click', copyResult);
 
+    // 自动翻译开关
+    autoTranslateCheckbox.addEventListener('change', toggleAutoTranslate);
+
     // 排除网站开关
     excludeSiteCheckbox.addEventListener('change', toggleExcludeSite);
 
@@ -89,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (response.success) {
         languages = response.data;
         
-        // 清空现有选项（保留auto选项）
+        // 清空现有选项（保留 auto 选项）
         let autoOption = sourceLangSelect.querySelector('option[value="auto"]');
         if (!autoOption) {
           autoOption = document.createElement('option');
@@ -114,10 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
           targetLangSelect.appendChild(option2);
         });
       } else {
-        showError(`加载语言列表失败: ${response.error}`);
+        showError(`加载语言列表失败：${response.error}`);
       }
     } catch (error) {
-      showError(`加载语言列表失败: ${error.message}`);
+      showError(`加载语言列表失败：${error.message}`);
     }
   }
 
@@ -154,10 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (response.success) {
         resultArea.textContent = response.data.translatedText;
       } else {
-        showError(`翻译失败: ${response.error}`);
+        showError(`翻译失败：${response.error}`);
       }
     } catch (error) {
-      showError(`翻译失败: ${error.message}`);
+      showError(`翻译失败：${error.message}`);
     } finally {
       showLoading(false);
     }
@@ -202,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       window.close();
     } catch (error) {
-      showError(`页面翻译失败: ${error.message}`);
+      showError(`页面翻译失败：${error.message}`);
     }
   }
 
@@ -218,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       window.close();
     } catch (error) {
-      showError(`页面还原失败: ${error.message}`);
+      showError(`页面还原失败：${error.message}`);
     }
   }
 
@@ -246,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       
-      // 跳过chrome://等特殊页面
+      // 跳过 chrome://等特殊页面
       if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('brave://')) {
         return;
       }
@@ -267,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      // 如果内容脚本没有响应，再尝试使用scripting API
+      // 如果内容脚本没有响应，再尝试使用 scripting API
       const result = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => window.getSelection().toString()
@@ -308,7 +315,24 @@ document.addEventListener('DOMContentLoaded', () => {
     translatePageBtn.disabled = show;
     restorePageBtn.disabled = show;
     copyBtn.disabled = show;
+    autoTranslateCheckbox.disabled = show;
     excludeSiteCheckbox.disabled = show;
+  }
+
+  // 初始化自动翻译开关状态
+  async function initAutoTranslateSwitch(settings) {
+    autoTranslateCheckbox.checked = settings.autoTranslate || false;
+  }
+
+  // 切换自动翻译状态
+  async function toggleAutoTranslate() {
+    try {
+      await chrome.storage.local.set({ autoTranslate: autoTranslateCheckbox.checked });
+      showError(autoTranslateCheckbox.checked ? '已启用自动翻译' : '已禁用自动翻译');
+    } catch (error) {
+      console.error('切换自动翻译状态失败:', error);
+      showError('操作失败：' + error.message);
+    }
   }
 
   // 初始化排除网站开关状态
@@ -351,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showError(excludeSiteCheckbox.checked ? '已添加到自动翻译排除列表' : '已从自动翻译排除列表移除');
     } catch (error) {
       console.error('切换排除网站状态失败:', error);
-      showError('操作失败: ' + error.message);
+      showError('操作失败：' + error.message);
     }
   }
 

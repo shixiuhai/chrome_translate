@@ -72,21 +72,31 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // 监听标签页更新事件，用于自动翻译
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url && !tab.url.startsWith('chrome://')) {
+    console.log('[自动翻译] 页面加载完成:', tab.url);
     const settings = await getSettings();
+    console.log('[自动翻译] 当前设置:', settings);
+    
     if (settings.autoTranslate) {
       // 检查是否在排除网站列表中
       const excludedSites = settings.autoTranslateExcludedSites || [];
       const isExcluded = excludedSites.some(site => tab.url.includes(site));
       
+      console.log('[自动翻译] 是否在排除列表:', isExcluded);
+      
       if (!isExcluded) {
-        // 向内容脚本发送自动翻译检查消息
-        chrome.tabs.sendMessage(tabId, {
-          action: 'autoTranslateCheck',
-          data: settings
-        }).catch(() => {
-          // 内容脚本可能还未加载，忽略错误
-        });
+        // 延迟一点发送消息，确保内容脚本已准备好
+        setTimeout(() => {
+          console.log('[自动翻译] 发送自动翻译检查消息');
+          chrome.tabs.sendMessage(tabId, {
+            action: 'autoTranslateCheck',
+            data: settings
+          }).catch((err) => {
+            console.warn('[自动翻译] 发送消息失败:', err.message);
+          });
+        }, 300);
       }
+    } else {
+      console.log('[自动翻译] 自动翻译未启用');
     }
   }
 });

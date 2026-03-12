@@ -791,13 +791,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // 自动翻译检查
 async function checkAutoTranslate(settings) {
-  if (!settings.autoTranslate || isTranslating) return;
+  console.log('[自动翻译] 检查自动翻译设置:', settings);
+  
+  if (!settings.autoTranslate) {
+    console.log('[自动翻译] 自动翻译未启用，跳过');
+    return;
+  }
+  
+  if (isTranslating) {
+    console.log('[自动翻译] 正在翻译中，跳过');
+    return;
+  }
 
   try {
+    // 等待 DOM 完全加载
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     // 检测页面语言
     const pageText = document.body.innerText.slice(0, 1000);
-    if (!pageText.trim()) return;
+    if (!pageText.trim()) {
+      console.log('[自动翻译] 页面文本为空，跳过');
+      return;
+    }
 
+    console.log('[自动翻译] 正在检测页面语言...');
     const detectResponse = await chrome.runtime.sendMessage({
       action: 'translate',
       data: {
@@ -808,6 +825,8 @@ async function checkAutoTranslate(settings) {
       }
     });
 
+    console.log('[自动翻译] 语言检测结果:', detectResponse);
+    
     if (detectResponse.success && detectResponse.data.detectedLanguage) {
       const detectedLang = detectResponse.data.detectedLanguage.language;
       
@@ -819,6 +838,8 @@ async function checkAutoTranslate(settings) {
         shouldTranslate = detectedLang !== settings.defaultTarget;
       }
 
+      console.log('[自动翻译] 是否应该翻译:', shouldTranslate, '检测到的语言:', detectedLang);
+
       if (shouldTranslate) {
         showNotification(`检测到${detectedLang}语言，正在自动翻译...`);
         // 使用检测到的源语言进行翻译，提高翻译准确率
@@ -826,6 +847,6 @@ async function checkAutoTranslate(settings) {
       }
     }
   } catch (error) {
-    console.error('自动翻译检测失败:', error);
+    console.error('[自动翻译] 检测失败:', error);
   }
 }

@@ -160,80 +160,6 @@
       font-size: 14px;
     }
 
-    .form-section {
-      margin-top: 32px;
-      padding-top: 24px;
-      border-top: 1px solid var(--border-color);
-    }
-
-    .form-section h3 {
-      margin: 0 0 20px 0;
-      font-size: 20px;
-      color: var(--text-color);
-      font-weight: 600;
-    }
-
-    .shortcut-item {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 16px;
-      transition: all 0.2s ease;
-    }
-    
-    .shortcut-item:hover {
-      border-color: var(--primary-color);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    }
-
-    .shortcut-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .shortcut-name {
-      font-weight: 500;
-      font-size: 15px;
-      color: var(--text-color);
-    }
-
-    .shortcut-key {
-      background: var(--primary-color);
-      color: white;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    .shortcut-config {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-
-    .action-select {
-      flex: 1;
-    }
-
-    .target-select {
-      width: 120px;
-    }
-
-    .shortcut-info {
-      background: var(--input-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 16px;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
     a {
       color: var(--primary-color);
       text-decoration: none;
@@ -376,58 +302,6 @@
       <div class="hint">逗号分隔的网站域名，这些网站不会自动翻译</div>
     </div>
 
-    <div class="form-section">
-      <h3>快捷键设置</h3>
-      
-      <div class="shortcut-item">
-        <div class="shortcut-header">
-          <span class="shortcut-name">快捷键 1</span>
-          <code class="shortcut-key">Ctrl+Shift+T / Cmd+Shift+T</code>
-        </div>
-        <div class="shortcut-config">
-          <select id="shortcut1Action" class="action-select">
-            <option value="translateSelection">翻译选中文本</option>
-            <option value="translatePage">翻译整个页面</option>
-            <option value="restoreOriginalPage">还原页面原文</option>
-          </select>
-          <select id="shortcut1Target" class="target-select">
-          </select>
-        </div>
-        <div class="hint">选择快捷键触发的功能和目标语言</div>
-      </div>
-
-      <div class="shortcut-item">
-        <div class="shortcut-header">
-          <span class="shortcut-name">快捷键 2</span>
-          <code class="shortcut-key">Ctrl+Shift+Y / Cmd+Shift+Y</code>
-        </div>
-        <div class="shortcut-config">
-          <select id="shortcut2Action" class="action-select">
-            <option value="translateSelection">翻译选中文本</option>
-            <option value="translatePage">翻译整个页面</option>
-            <option value="restoreOriginalPage">还原页面原文</option>
-          </select>
-          <select id="shortcut2Target" class="target-select">
-          </select>
-        </div>
-        <div class="hint">选择快捷键触发的功能和目标语言</div>
-      </div>
-
-      <div class="shortcut-item">
-        <div class="shortcut-header">
-          <span class="shortcut-name">弹出窗口</span>
-          <code class="shortcut-key">Ctrl+Shift+X / Cmd+Shift+X</code>
-        </div>
-        <div class="shortcut-info">
-          <p>按下快捷键可快速打开插件弹出窗口</p>
-          <p class="hint" style="margin: 8px 0 0 0;">
-            如需修改快捷键组合，请打开 Chrome 扩展管理页面
-            <code style="background: var(--input-bg); padding: 2px 6px; border-radius: 3px; font-family: monospace;">chrome://extensions/shortcuts</code>
-            进行配置。
-          </p>
-        </div>
-      </div>
-    </div>
     
     <div class="button-group">
       <button class="save-btn" id="saveBtn">保存设置</button>
