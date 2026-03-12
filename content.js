@@ -1,14 +1,14 @@
 // 内容脚本 - 注入到网页中
-let originalTexts = new Map();
+let originalTexts = new Map(); // 存储原始文本，用于回退
 let isTranslating = false;
 let currentTranslationTarget = 'zh-Hans';
 let translationObserver = null;
 
-// 分批翻译配置
-const BATCH_CONFIG = {
+// 翻译配置
+const TRANSLATION_CONFIG = {
   maxCharsPerBatch: 4000,      // 每批次最大字符数
-  maxUnitsPerBatch: 20,        // 每批次最大单元数
-  concurrency: 3,              // 并发翻译批次数
+  maxNodesPerBatch: 30,        // 每批次最大节点数
+  concurrency: 4,              // 并发翻译批次数
   retryTimes: 2,                // 失败重试次数
   retryDelay: 1000              // 重试延迟（毫秒）
 };
@@ -19,7 +19,7 @@ let translationProgress = { total: 0, completed: 0, failed: 0 };
 
 // 并发控制器类
 class ConcurrencyController {
-  constructor(maxConcurrency = 3) {
+  constructor(maxConcurrency = 4) {
     this.maxConcurrency = maxConcurrency;
     this.running = 0;
     this.queue = [];
@@ -52,32 +52,51 @@ function isExcludedText(text) {
   if (/^\d+([,.]\d+)*$/.test(text)) return true;
   // 排除纯符号
   if (/^[^\w\s\u4e00-\u9fff]+$/.test(text)) return true;
+  // 排除过短文本
+  if (text.length < 2) return true;
   return false;
 }
 
-// 拆分HTML为翻译单元
-function splitHtmlToUnits() {
-  const units = [];
+// 收集所有可翻译的文本节点
+function collectTextNodes(root = document.body) {
+  const textNodes = [];
   const walker = document.createTreeWalker(
-    document.body,
-    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+    root,
+    NodeFilter.SHOW_TEXT,
     {
       acceptNode: function(node) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const tagName = node.tagName.toUpperCase();
-          const excludedTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME',
-                               'OBJECT', 'EMBED', 'INPUT', 'TEXTAREA',
-                               'SELECT', 'CODE', 'PRE', 'CANVAS', 'SVG'];
-          if (excludedTags.includes(tagName)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          if (node.hidden || node.style.display === 'none') {
-            return NodeFilter.FILTER_REJECT;
-          }
-          if (node.isContentEditable) {
-            return NodeFilter.FILTER_REJECT;
-          }
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        
+        // 排除的标签
+        const excludedTags = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME',
+                             'OBJECT', 'EMBED', 'INPUT', 'TEXTAREA',
+                             'SELECT', 'CODE', 'PRE', 'CANVAS', 'SVG',
+                             'NOSCRIPT', 'META', 'LINK', 'STYLE'];
+        
+        const tagName = parent.tagName.toUpperCase();
+        if (excludedTags.includes(tagName)) {
+          return NodeFilter.FILTER_REJECT;
         }
+        
+        // 排除隐藏元素
+        if (parent.hidden || parent.style.display === 'none' || 
+            parent.style.visibility === 'hidden' || 
+            parent.offsetParent === null) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        
+        // 排除可编辑元素
+        if (parent.isContentEditable) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        
+        // 排除空白文本
+        const text = node.textContent.trim();
+        if (!text || isExcludedText(text)) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        
         return NodeFilter.FILTER_ACCEPT;
       }
     }
@@ -85,90 +104,52 @@ function splitHtmlToUnits() {
 
   let node;
   while (node = walker.nextNode()) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent.trim();
-      if (text.length >= 2 && !isExcludedText(text)) {
-        units.push({
-          id: `unit-${Math.random().toString(36).substr(2, 9)}`,
-          type: node.parentNode?.tagName?.toLowerCase() || 'text',
-          originalText: text,
-          originalNode: node
-        });
-      }
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const tagName = node.tagName.toUpperCase();
-      const inlineTags = ['BUTTON', 'A', 'SPAN', 'B', 'I', 'STRONG', 'EM'];
-      if (inlineTags.includes(tagName) && node.textContent.trim().length >= 2) {
-        // 检查是否已有子节点被处理
-        if (!units.some(u => u.originalNode === node ||
-                        u.originalNode.parentNode === node)) {
-          units.push({
-            id: `unit-${Math.random().toString(36).substr(2, 9)}`,
-            type: tagName.toLowerCase(),
-            originalText: node.textContent.trim(),
-            originalNode: node
-          });
-        }
-      }
+    // 保存原始文本
+    if (!originalTexts.has(node)) {
+      originalTexts.set(node, node.textContent);
     }
+    textNodes.push(node);
   }
 
-  return units;
+  return textNodes;
 }
 
-// 分组形成翻译批次
-function groupUnitsIntoBatches(units, config) {
+// 将文本节点分组为批次
+function groupTextNodesIntoBatches(textNodes, config) {
   const batches = [];
   let currentBatch = [];
   let currentChars = 0;
 
-  for (const unit of units) {
-    const unitChars = unit.originalText.length;
+  for (const node of textNodes) {
+    const text = node.textContent.trim();
+    const textLength = text.length;
     
-    // 如果单个单元超过最大字符数，单独成一个批次
-    if (unitChars > config.maxCharsPerBatch) {
+    // 如果单个文本过长，单独成批次
+    if (textLength > config.maxCharsPerBatch) {
       if (currentBatch.length > 0) {
-        batches.push({
-          units: currentBatch,
-          totalChars: currentChars
-        });
+        batches.push(currentBatch);
         currentBatch = [];
         currentChars = 0;
       }
-      // 单独处理大单元
-      batches.push({
-        units: [unit],
-        totalChars: unitChars
-      });
+      batches.push([node]);
       continue;
     }
 
-    // 如果添加这个单元会超过限制
-    if (currentChars + unitChars > config.maxCharsPerBatch ||
-        currentBatch.length >= config.maxUnitsPerBatch) {
-      // 添加当前批次
-      if (currentBatch.length > 0) {
-        batches.push({
-          units: currentBatch,
-          totalChars: currentChars
-        });
-      }
-      // 开始新批次
-      currentBatch = [unit];
-      currentChars = unitChars;
-    } else {
-      // 添加到当前批次
-      currentBatch.push(unit);
-      currentChars += unitChars;
+    // 检查添加后是否超过限制
+    if (currentChars + textLength > config.maxCharsPerBatch || 
+        currentBatch.length >= config.maxNodesPerBatch) {
+      batches.push(currentBatch);
+      currentBatch = [];
+      currentChars = 0;
     }
+
+    currentBatch.push(node);
+    currentChars += textLength;
   }
 
   // 添加最后一个批次
   if (currentBatch.length > 0) {
-    batches.push({
-      units: currentBatch,
-      totalChars: currentChars
-    });
+    batches.push(currentBatch);
   }
 
   return batches;
@@ -208,7 +189,7 @@ function showProgress(total) {
         正在翻译...
       </div>
       <div style="position: relative; height: 8px; background: ${isDarkMode ? '#3e3e3e' : '#e0e0e0'}; border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
-        <div id="progress-bar" style="position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #4285f4; transition: width 0.3s ease;"></;div>
+        <div id="progress-bar" style="position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #4285f4; transition: width 0.3s ease;"></div>
       </div>
       <div id="progress-text" style="font-size: 14px; color: ${isDarkMode ? '#aaa' : '#666'};">
         0 / ${total} (0%)
@@ -250,14 +231,14 @@ function hideProgress() {
   }
 }
 
-// 批次翻译带重试
-async function translateBatchWithRetry(batch, source, target, config) {
+// 翻译单个批次
+async function translateBatch(batch, source, target, config) {
   let retries = 0;
   let lastError = null;
 
   while (retries <= config.retryTimes) {
     try {
-      const texts = batch.units.map(u => u.originalText);
+      const texts = batch.map(node => node.textContent.trim());
       
       const response = await chrome.runtime.sendMessage({
         action: 'translate',
@@ -275,63 +256,37 @@ async function translateBatchWithRetry(batch, source, target, config) {
 
       const translations = response.data.translatedText || [];
       
-      return {
-        success: true,
-        data: batch.units.map((unit, index) => ({
-          unit,
-          translatedText: translations[index] || unit.originalText
-        }))
-      };
+      // 应用翻译结果
+      batch.forEach((node, index) => {
+        if (translations[index] && document.body.contains(node)) {
+          // 保留原始空格
+          const originalText = node.textContent;
+          const leadingSpace = originalText.match(/^\s*/)[0];
+          const trailingSpace = originalText.match(/\s*$/)[0];
+          node.textContent = leadingSpace + translations[index] + trailingSpace;
+        }
+      });
+
+      return { success: true };
     } catch (error) {
       lastError = error;
       retries++;
       
       if (retries <= config.retryTimes) {
-        await new Promise(resolve =>
+        await new Promise(resolve => 
           setTimeout(resolve, config.retryDelay * retries)
         );
       }
     }
   }
 
-  return {
-    success: false,
-    error: lastError?.message || 'Unknown error'
+  return { 
+    success: false, 
+    error: lastError?.message || 'Unknown error' 
   };
 }
 
-// 应用翻译结果
-function applyTranslationResult(result) {
-  result.forEach(item => {
-    try {
-      const { unit, translatedText } = item;
-      
-      // 检查节点是否仍然存在
-      if (!document.body.contains(unit.originalNode)) {
-        console.warn('Node no longer exists:', unit.id);
-        return;
-      }
-
-      // 根据节点类型应用翻译
-      if (unit.type === 'text') {
-        // 纯文本节点
-        unit.originalNode.textContent = translatedText;
-      } else {
-        // 其他元素，替换内部文本内容
-        const originalText = unit.originalText;
-        const newHtml = unit.originalNode.innerHTML.replace(
-          originalText,
-          translatedText
-        );
-        unit.originalNode.innerHTML = newHtml;
-      }
-    } catch (error) {
-      console.error('Failed to apply translation:', error);
-    }
-  });
-}
-
-// 新的页面翻译函数 - 使用分批翻译
+// 页面翻译函数 - 使用纯文本节点翻译
 async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   if (isTranslating) {
     showNotification('正在翻译中，请稍候...');
@@ -341,23 +296,23 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
   isTranslating = true;
   currentTranslationTarget = target;
 
-  console.log('=== 开始分批翻译 ===');
+  console.log('=== 开始纯文本节点翻译 ===');
   console.log('源语言:', source, '目标语言:', target);
 
   try {
-    // 步骤1：拆分HTML为翻译单元
-    console.log('=== 步骤1: 拆分HTML为翻译单元 ===');
-    const units = splitHtmlToUnits();
-    console.log(`找到 ${units.length} 个可翻译单元`);
+    // 步骤1：收集所有文本节点
+    console.log('=== 步骤1: 收集文本节点 ===');
+    const textNodes = collectTextNodes();
+    console.log(`找到 ${textNodes.length} 个可翻译文本节点`);
 
-    if (units.length === 0) {
+    if (textNodes.length === 0) {
       showNotification('页面中没有可翻译的内容', 'info');
       return;
     }
 
     // 步骤2：分组
     console.log('=== 步骤2: 分组形成翻译批次 ===');
-    const batches = groupUnitsIntoBatches(units, BATCH_CONFIG);
+    const batches = groupTextNodesIntoBatches(textNodes, TRANSLATION_CONFIG);
     console.log(`形成 ${batches.length} 个翻译批次`);
 
     // 显示进度
@@ -365,21 +320,18 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
 
     // 步骤3：并发翻译
     console.log('=== 步骤3: 并发翻译批次 ===');
-    const controller = new ConcurrencyController(BATCH_CONFIG.concurrency);
+    const controller = new ConcurrencyController(TRANSLATION_CONFIG.concurrency);
     const results = await Promise.all(batches.map((batch, index) =>
       controller.run(async () => {
-        const result = await translateBatchWithRetry(batch, source, target, BATCH_CONFIG);
+        const result = await translateBatch(batch, source, target, TRANSLATION_CONFIG);
         
         if (result.success) {
           translationProgress.completed++;
-          updateProgress();
-          // 立即应用翻译结果
-          applyTranslationResult(result.data);
         } else {
           translationProgress.failed++;
-          updateProgress();
         }
         
+        updateProgress();
         return result;
       })
     ));
@@ -401,7 +353,7 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
       showNotification('页面翻译完成！');
     }
 
-    console.log('=== 分批翻译完成 ===');
+    console.log('=== 纯文本节点翻译完成 ===');
   } catch (error) {
     console.error('翻译过程出错:', error);
     showNotification(`翻译失败: ${error.message}`, 'error');
@@ -427,20 +379,12 @@ function restoreOriginalPage() {
     // 保存当前滚动位置
     const scrollY = window.scrollY;
     
-    originalTexts.forEach((data, node) => {
-      if (node && node.parentNode) { // 确保节点仍然存在
-        const originalContent = typeof data === 'object' ? data.text : data;
-        // 根据存储的数据类型选择合适的还原方式
-        if (typeof data === 'object' && data.isHTML) {
-          // HTML内容使用innerHTML还原
-          node.innerHTML = originalContent;
-        } else {
-          // 纯文本使用textContent还原
-          node.textContent = originalContent;
-        }
+    originalTexts.forEach((originalText, node) => {
+      if (node && node.parentNode && document.body.contains(node)) {
+        // 直接恢复文本节点内容
+        node.textContent = originalText;
       }
     });
-    originalTexts.clear();
     
     // 停止动态内容监听
     if (translationObserver) {
@@ -856,4 +800,3 @@ async function checkAutoTranslate(settings) {
     console.error('自动翻译检测失败:', error);
   }
 }
-

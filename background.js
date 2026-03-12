@@ -33,7 +33,13 @@ chrome.runtime.onInstalled.addListener(() => {
 
   chrome.contextMenus.create({
     id: 'translate-page',
-    title: '翻译整个页面',
+    title: '翻译全文',
+    contexts: ['page']
+  });
+  
+  chrome.contextMenus.create({
+    id: 'restore-page',
+    title: '还原页面',
     contexts: ['page']
   });
 });
@@ -60,6 +66,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         source: 'auto',
         target: targetLanguage
       }
+    });
+  } else if (info.menuItemId === 'restore-page') {
+    // 向内容脚本发送还原页面的消息
+    chrome.tabs.sendMessage(tab.id, {
+      action: 'restoreOriginalPage'
     });
   }
 });
@@ -175,35 +186,6 @@ async function getSupportedLanguages() {
   }
 }
 
-// 快捷键命令监听
-chrome.commands.onCommand.addListener(async (command, tab) => {
-  const settings = await getSettings();
-  
-  if (command === 'shortcut-1') {
-    const action = settings.shortcut1Action || 'translateSelection';
-    const target = settings.shortcut1Target || 'zh-Hans';
-    chrome.tabs.sendMessage(tab.id, {
-      action: action,
-      data: {
-        source: 'auto',
-        target: target
-      }
-    });
-  } else if (command === 'shortcut-2') {
-    const action = settings.shortcut2Action || 'translatePage';
-    const target = settings.shortcut2Target || 'zh-Hans';
-    chrome.tabs.sendMessage(tab.id, {
-      action: action,
-      data: {
-        source: 'auto',
-        target: target
-      }
-    });
-  } else if (command === '_execute_action') {
-    // 打开弹出窗口
-    chrome.action.openPopup();
-  }
-});
 
 // 获取存储的设置
 function getSettings() {
