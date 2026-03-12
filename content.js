@@ -231,22 +231,23 @@ function hideProgress() {
   }
 }
 
-// 翻译单个批次
+// 翻译单个批次 - 使用 HTML 格式批量翻译
 async function translateBatch(batch, source, target, config) {
   let retries = 0;
   let lastError = null;
 
   while (retries <= config.retryTimes) {
     try {
-      const texts = batch.map(node => node.textContent.trim());
+      // 将文本用 <p> 标签拼接成 HTML 字符串
+      const htmlContent = batch.map(node => '<p>' + escapeHtmlForApi(node.textContent.trim()) + '</p>').join('');
       
       const response = await chrome.runtime.sendMessage({
         action: 'translate',
         data: {
-          q: texts,
+          q: htmlContent,
           source,
           target,
-          format: 'text'
+          format: 'html'  // 使用 HTML 格式
         }
       });
 
@@ -254,16 +255,21 @@ async function translateBatch(batch, source, target, config) {
         throw new Error(response.error || 'Translation failed');
       }
 
-      let translations = response.data.translatedText || [];
+      // 解析返回的 HTML，提取每个 <p> 标签中的内容
+      let translations = [];
+      const translatedHtml = response.data.translatedText || '';
       
-      // 处理 API 返回 JSON 字符串的情况
-      if (typeof translations === 'string') {
-        try {
-          translations = JSON.parse(translations);
-        } catch (e) {
-          // 如果不是 JSON 字符串，转为数组
-          translations = [translations];
-        }
+      // 使用正则表达式提取 <p> 标签中的内容
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(translatedHtml, 'text/html');
+      const pTags = doc.querySelectorAll('p');
+      pTags.forEach(p => {
+        translations.push(p.textContent);
+      });
+      
+      // 如果没有 <p> 标签，说明可能是纯文本返回
+      if (translations.length === 0 && translatedHtml) {
+        translations = [translatedHtml];
       }
       
       // 应用翻译结果
@@ -283,17 +289,24 @@ async function translateBatch(batch, source, target, config) {
       retries++;
       
       if (retries <= config.retryTimes) {
-        await new Promise(resolve => 
+        await new Promise(resolve =>
           setTimeout(resolve, config.retryDelay * retries)
         );
       }
     }
   }
 
-  return { 
-    success: false, 
-    error: lastError?.message || 'Unknown error' 
+  return {
+    success: false,
+    error: lastError?.message || 'Unknown error'
   };
+}
+
+// HTML 转义用于 API 请求
+function escapeHtmlForApi(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // 页面翻译函数 - 使用纯文本节点翻译

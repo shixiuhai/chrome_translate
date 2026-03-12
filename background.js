@@ -114,24 +114,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// 翻译处理函数 - 修复批量翻译，确保 format=text 正确传递
-async function handleTranslation({ q, source, target, format = 'text' }) {
+// 翻译处理函数 - 使用 HTML 格式批量翻译
+async function handleTranslation({ q, source, target, format = 'html' }) {
   const settings = await getSettings();
   
   if (!settings.apiUrl) {
     throw new Error('请先配置翻译 API 地址');
   }
 
-  // 使用 FormData 发送翻译请求，支持数组和字符串两种格式
+  // 使用 FormData 发送翻译请求
   const formData = new FormData();
-  if (Array.isArray(q)) {
-    q.forEach(text => formData.append('q', text));
-  } else {
-    formData.append('q', q);
-  }
+  formData.append('q', q);  // HTML 字符串
   formData.append('source', source || settings.defaultSource || 'auto');
   formData.append('target', target || settings.defaultTarget || 'zh-Hans');
-  formData.append('format', format);
+  formData.append('format', format);  // 使用 'html' 格式
   
   if (settings.apiKey) {
     formData.append('api_key', settings.apiKey);
@@ -149,17 +145,7 @@ async function handleTranslation({ q, source, target, format = 'text' }) {
       throw new Error(errorData?.error || `翻译请求失败：${response.status}`);
     }
 
-    let result = await response.json();
-    
-    // 处理 API 返回的 translatedText 是 JSON 字符串的情况
-    if (typeof result.translatedText === 'string') {
-      try {
-        result.translatedText = JSON.parse(result.translatedText);
-      } catch (e) {
-        // 如果不是 JSON 字符串，保持原样
-      }
-    }
-    
+    const result = await response.json();
     return result;
   } catch (error) {
     throw new Error(`翻译失败：${error.message}`);
