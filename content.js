@@ -259,7 +259,7 @@ async function translateBatch(batch, source, target, config) {
       let translations = [];
       const translatedHtml = response.data.translatedText || '';
       
-      // 使用正则表达式提取 <p> 标签中的内容
+      // 使用 DOMParser 提取 <p> 标签中的内容
       const parser = new DOMParser();
       const doc = parser.parseFromString(translatedHtml, 'text/html');
       const pTags = doc.querySelectorAll('p');
@@ -272,9 +272,15 @@ async function translateBatch(batch, source, target, config) {
         translations = [translatedHtml];
       }
       
+      // 验证返回的翻译数量是否与原文本节点数量一致
+      if (translations.length !== batch.length) {
+        console.warn(`翻译数量不匹配：原文本节点 ${batch.length} 个，翻译结果 ${translations.length} 个`);
+        // 如果数量不一致，按索引对应，超出部分忽略
+      }
+      
       // 应用翻译结果
       batch.forEach((node, index) => {
-        if (translations[index] && document.body.contains(node)) {
+        if (index < translations.length && translations[index] && document.body.contains(node)) {
           // 保留原始空格
           const originalText = node.textContent;
           const leadingSpace = originalText.match(/^\s*/)[0];

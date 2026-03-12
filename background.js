@@ -114,8 +114,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// 翻译处理函数 - 使用 HTML 格式批量翻译
-async function handleTranslation({ q, source, target, format = 'html' }) {
+// 翻译处理函数 - 支持 HTML 和 text 格式
+async function handleTranslation({ q, source, target, format = 'text' }) {
   const settings = await getSettings();
   
   if (!settings.apiUrl) {
@@ -124,10 +124,10 @@ async function handleTranslation({ q, source, target, format = 'html' }) {
 
   // 使用 FormData 发送翻译请求
   const formData = new FormData();
-  formData.append('q', q);  // HTML 字符串
+  formData.append('q', q);
   formData.append('source', source || settings.defaultSource || 'auto');
   formData.append('target', target || settings.defaultTarget || 'zh-Hans');
-  formData.append('format', format);  // 使用 'html' 格式
+  formData.append('format', format);
   
   if (settings.apiKey) {
     formData.append('api_key', settings.apiKey);
