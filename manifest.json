@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LibreTranslate 翻译插件",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "自定义LibreTranslate接口的网页翻译插件",
   "permissions": [
     "storage",

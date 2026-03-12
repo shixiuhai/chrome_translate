@@ -33,70 +33,80 @@
     }
 
     body {
-      width: 500px;
-      padding: 20px;
+      min-height: 100vh;
+      padding: 40px 20px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: var(--bg-color);
       margin: 0;
       color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      box-sizing: border-box;
     }
     .container {
       background: var(--container-bg);
-      padding: 25px;
-      border-radius: 8px;
+      padding: 32px;
+      border-radius: 12px;
       box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 580px;
+      box-sizing: border-box;
     }
     h1 {
-      font-size: 24px;
-      margin: 0 0 20px 0;
+      font-size: 28px;
+      margin: 0 0 32px 0;
       color: var(--text-color);
       text-align: center;
+      font-weight: 600;
     }
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
     label {
       display: block;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       font-weight: 500;
       color: var(--text-secondary);
       font-size: 14px;
     }
     input, select {
       width: 100%;
-      padding: 10px;
+      padding: 12px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 4px;
+      border-radius: 8px;
       font-size: 14px;
       box-sizing: border-box;
-      transition: border-color 0.3s;
+      transition: all 0.2s ease;
       background-color: var(--input-bg);
       color: var(--text-color);
     }
     input:focus, select:focus {
       outline: none;
-      border-color: #4285f4;
-      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+      transform: translateY(-1px);
     }
     .hint {
       font-size: 12px;
       color: var(--text-hint);
-      margin-top: 4px;
+      margin-top: 6px;
+      line-height: 1.4;
     }
     .button-group {
-      display: flex;
-      gap: 10px;
-      margin-top: 25px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 32px;
     }
     button {
-      flex: 1;
-      padding: 12px;
+      padding: 14px;
       border: none;
-      border-radius: 4px;
-      font-size: 14px;
+      border-radius: 8px;
+      font-size: 15px;
       font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.3s;
+      transition: all 0.2s ease;
     }
     .save-btn {
       background-color: #4285f4;
@@ -104,6 +114,12 @@
     }
     .save-btn:hover {
       background-color: #3367d6;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);
+    }
+    
+    .save-btn:active {
+      transform: translateY(0);
     }
     .test-btn {
       background-color: #34a853;
@@ -111,13 +127,20 @@
     }
     .test-btn:hover {
       background-color: #2e8b57;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(52, 168, 83, 0.3);
+    }
+    
+    .test-btn:active {
+      transform: translateY(0);
     }
     .status {
-      margin-top: 15px;
-      padding: 10px;
-      border-radius: 4px;
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 8px;
       display: none;
       font-size: 14px;
+      line-height: 1.5;
     }
     .status.success {
       background-color: #e6f4ea;
@@ -131,20 +154,21 @@
     }
     .loading {
       text-align: center;
-      padding: 10px;
-      color: #666;
+      padding: 20px;
+      color: var(--text-secondary);
       display: none;
+      font-size: 14px;
     }
 
     .form-section {
-      margin-top: 25px;
-      padding-top: 20px;
+      margin-top: 32px;
+      padding-top: 24px;
       border-top: 1px solid var(--border-color);
     }
 
     .form-section h3 {
-      margin: 0 0 15px 0;
-      font-size: 18px;
+      margin: 0 0 20px 0;
+      font-size: 20px;
       color: var(--text-color);
       font-weight: 600;
     }
@@ -152,9 +176,16 @@
     .shortcut-item {
       background: var(--card-bg);
       border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 15px;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 16px;
+      transition: all 0.2s ease;
+    }
+    
+    .shortcut-item:hover {
+      border-color: var(--primary-color);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
 
     .shortcut-header {
@@ -173,10 +204,11 @@
     .shortcut-key {
       background: var(--primary-color);
       color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-family: monospace;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
       font-size: 12px;
+      font-weight: 500;
     }
 
     .shortcut-config {
@@ -196,10 +228,10 @@
     .shortcut-info {
       background: var(--input-bg);
       border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 12px;
+      border-radius: 8px;
+      padding: 16px;
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     a {
@@ -209,6 +241,82 @@
 
     a:hover {
       text-decoration: underline;
+    }
+
+    .toggle-group {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px 20px;
+      transition: all 0.2s ease;
+    }
+
+    .toggle-group:hover {
+      border-color: var(--primary-color);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .toggle-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .toggle-text {
+      font-weight: 500;
+      font-size: 15px;
+      color: var(--text-color);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 24px;
+    }
+
+    .toggle-input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    .toggle-input:checked + .toggle-slider {
+      background-color: var(--primary-color);
+    }
+
+    .toggle-input:focus + .toggle-slider {
+      box-shadow: 0 0 1px var(--primary-color);
+    }
+
+    .toggle-input:checked + .toggle-slider:before {
+      transform: translateX(24px);
     }
   </style>
 </head>
