@@ -200,6 +200,6 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
 // 获取存储的设置
 function getSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target'], resolve);
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target', 'autoTranslateExcludedSites'], resolve);
   });
 }

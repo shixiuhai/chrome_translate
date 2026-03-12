@@ -176,14 +176,21 @@ document.addEventListener('DOMContentLoaded', () => {
       showLoading(true);
       
       // 测试健康检查接口
-      const healthResponse = await fetch(`${apiUrl.replace(/\/$/, '')}/health`);
-      if (!healthResponse.ok) {
-        throw new Error(`健康检查失败: ${healthResponse.status}`);
-      }
-      
-      const healthData = await healthResponse.json();
-      if (healthData.status !== 'ok') {
-        throw new Error('服务状态不正常');
+      // 尝试健康检查接口，如不支持则跳过
+      let healthResponse;
+      try {
+        healthResponse = await fetch(`${apiUrl.replace(/\/$/, '')}/health`, {
+          signal: AbortSignal.timeout(5000) // 5秒超时
+        });
+        if (healthResponse.ok) {
+          const healthData = await healthResponse.json();
+          if (healthData.status !== 'ok') {
+            console.warn('服务健康状态警告:', healthData);
+          }
+        }
+      } catch (healthError) {
+        // 健康检查接口不存在或失败，不影响主要功能，继续测试翻译接口
+        console.warn('健康检查接口不可用，跳过:', healthError.message);
       }
 
       // 测试翻译接口

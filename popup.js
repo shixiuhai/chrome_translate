@@ -83,7 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
         languages = response.data;
         
         // 清空现有选项（保留auto选项）
-        const autoOption = sourceLangSelect.querySelector('option[value="auto"]');
+        let autoOption = sourceLangSelect.querySelector('option[value="auto"]');
+        if (!autoOption) {
+          autoOption = document.createElement('option');
+          autoOption.value = 'auto';
+          autoOption.textContent = '自动检测';
+        }
         sourceLangSelect.innerHTML = '';
         sourceLangSelect.appendChild(autoOption);
         
