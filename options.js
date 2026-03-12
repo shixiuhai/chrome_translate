@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const testBtn = document.getElementById('testBtn');
   const statusDiv = document.getElementById('status');
   const loadingDiv = document.getElementById('loading');
+  const autoTranslateCheckbox = document.getElementById('autoTranslate');
+  const autoTranslateLanguagesInput = document.getElementById('autoTranslateLanguages');
 
   // 加载已保存的设置
   loadSettings();
@@ -20,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 加载设置
   function loadSettings() {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget'], (result) => {
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages'], (result) => {
       if (result.apiUrl) {
         apiUrlInput.value = result.apiUrl;
         loadLanguages(result.apiUrl, result.apiKey).then(() => {
@@ -40,6 +42,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (result.apiKey) {
         apiKeyInput.value = result.apiKey;
       }
+
+      autoTranslateCheckbox.checked = result.autoTranslate || false;
+      autoTranslateLanguagesInput.value = result.autoTranslateLanguages ? result.autoTranslateLanguages.join(',') : '';
     });
   }
 
@@ -86,6 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiKey = apiKeyInput.value.trim();
     const defaultSource = defaultSourceSelect.value;
     const defaultTarget = defaultTargetSelect.value;
+    const autoTranslate = autoTranslateCheckbox.checked;
+    const autoTranslateLanguages = autoTranslateLanguagesInput.value
+      .split(',')
+      .map(lang => lang.trim())
+      .filter(lang => lang);
 
     if (!apiUrl) {
       showStatus('请填写 API 地址', 'error');
@@ -96,7 +106,9 @@ document.addEventListener('DOMContentLoaded', () => {
       apiUrl,
       apiKey,
       defaultSource,
-      defaultTarget
+      defaultTarget,
+      autoTranslate,
+      autoTranslateLanguages
     }, () => {
       showStatus('设置保存成功', 'success');
       // 重新加载语言列表

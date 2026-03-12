@@ -251,6 +251,54 @@ function showNotification(message, type = 'info') {
   }, 3000);
 }
 
+// 监听自动翻译检查
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'autoTranslateCheck') {
+    checkAutoTranslate(request.data);
+  }
+  return true;
+});
+
+// 自动翻译检查
+async function checkAutoTranslate(settings) {
+  if (!settings.autoTranslate || isTranslating) return;
+
+  try {
+    // 检测页面语言
+    const pageText = document.body.innerText.slice(0, 1000);
+    if (!pageText.trim()) return;
+
+    const detectResponse = await chrome.runtime.sendMessage({
+      action: 'translate',
+      data: {
+        q: pageText,
+        source: 'auto',
+        target: settings.defaultTarget,
+        format: 'text'
+      }
+    });
+
+    if (detectResponse.success && detectResponse.data.detectedLanguage) {
+      const detectedLang = detectResponse.data.detectedLanguage.language;
+      
+      // 检查是否需要自动翻译
+      let shouldTranslate = false;
+      if (settings.autoTranslateLanguages && settings.autoTranslateLanguages.length > 0) {
+        shouldTranslate = settings.autoTranslateLanguages.includes(detectedLang);
+      } else {
+        shouldTranslate = detectedLang !== settings.defaultTarget;
+      }
+
+      if (shouldTranslate) {
+        showNotification(`检测到${detectedLang}语言，正在自动翻译...`);
+        translateEntirePage('auto', settings.defaultTarget);
+      }
+    }
+  } catch (error) {
+    console.error('自动翻译检测失败:', error);
+  }
+}
+
 // 添加右键菜单翻译选项
 document.addEventListener('contextmenu', (e) => {
   const selection = window.getSelection();

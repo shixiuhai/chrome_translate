@@ -4,12 +4,45 @@
   <meta charset="UTF-8">
   <title>翻译插件</title>
   <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --text-secondary: #666666;
+      --border-color: #eeeeee;
+      --input-bg: #ffffff;
+      --button-bg: #4285f4;
+      --button-hover: #3367d6;
+      --secondary-button-bg: #f0f0f0;
+      --secondary-button-hover: #e0e0e0;
+      --result-bg: #f8f9fa;
+      --error-bg: #fce8e6;
+      --error-color: #c5221f;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #1e1e1e;
+        --text-color: #ffffff;
+        --text-secondary: #999999;
+        --border-color: #333333;
+        --input-bg: #2d2d2d;
+        --button-bg: #4285f4;
+        --button-hover: #3367d6;
+        --secondary-button-bg: #333333;
+        --secondary-button-hover: #444444;
+        --result-bg: #2d2d2d;
+        --error-bg: #4a2725;
+        --error-color: #f28b82;
+      }
+    }
+
     body {
       width: 350px;
       padding: 15px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
-      background-color: #fff;
+      background-color: var(--bg-color);
+      color: var(--text-color);
     }
     .header {
       display: flex;
@@ -17,12 +50,12 @@
       align-items: center;
       margin-bottom: 15px;
       padding-bottom: 10px;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--border-color);
     }
     .title {
       font-size: 16px;
       font-weight: 600;
-      color: #333;
+      color: var(--text-color);
     }
     .settings-btn {
       background: none;
@@ -32,9 +65,10 @@
       padding: 5px;
       border-radius: 4px;
       transition: background-color 0.2s;
+      color: var(--text-color);
     }
     .settings-btn:hover {
-      background-color: #f0f0f0;
+      background-color: var(--secondary-button-bg);
     }
     .language-selectors {
       display: flex;
@@ -47,31 +81,33 @@
     .language-selector label {
       display: block;
       font-size: 12px;
-      color: #666;
+      color: var(--text-secondary);
       margin-bottom: 4px;
     }
     .language-selector select {
       width: 100%;
       padding: 6px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       font-size: 13px;
-      background-color: #fff;
+      background-color: var(--input-bg);
+      color: var(--text-color);
     }
     .swap-btn {
       align-self: flex-end;
       background: none;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       padding: 6px 8px;
       cursor: pointer;
       font-size: 14px;
       margin-bottom: 1px;
       transition: all 0.2s;
+      color: var(--text-color);
     }
     .swap-btn:hover {
-      background-color: #f0f0f0;
-      border-color: #ccc;
+      background-color: var(--secondary-button-bg);
+      border-color: var(--border-color);
     }
     .input-area {
       margin-bottom: 15px;
@@ -80,12 +116,14 @@
       width: 100%;
       min-height: 80px;
       padding: 10px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       font-size: 14px;
       resize: vertical;
       box-sizing: border-box;
       font-family: inherit;
+      background-color: var(--input-bg);
+      color: var(--text-color);
     }
     .input-area textarea:focus {
       outline: none;
@@ -95,7 +133,7 @@
     .translate-btn {
       width: 100%;
       padding: 10px;
-      background-color: #4285f4;
+      background-color: var(--button-bg);
       color: white;
       border: none;
       border-radius: 4px;
@@ -106,15 +144,15 @@
       transition: background-color 0.2s;
     }
     .translate-btn:hover {
-      background-color: #3367d6;
+      background-color: var(--button-hover);
     }
     .translate-btn:disabled {
       background-color: #90baf9;
       cursor: not-allowed;
     }
     .result-area {
-      background-color: #f8f9fa;
-      border: 1px solid #e9ecef;
+      background-color: var(--result-bg);
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       padding: 10px;
       min-height: 60px;
@@ -136,25 +174,26 @@
     .action-btn {
       flex: 1;
       padding: 8px;
-      background-color: #f0f0f0;
-      border: 1px solid #ddd;
+      background-color: var(--secondary-button-bg);
+      border: 1px solid var(--border-color);
       border-radius: 4px;
       font-size: 12px;
       cursor: pointer;
       transition: all 0.2s;
+      color: var(--text-color);
     }
     .action-btn:hover {
-      background-color: #e0e0e0;
+      background-color: var(--secondary-button-hover);
     }
     .loading {
       text-align: center;
       padding: 10px;
-      color: #666;
+      color: var(--text-secondary);
       display: none;
     }
     .error {
-      color: #c5221f;
-      background-color: #fce8e6;
+      color: var(--error-color);
+      background-color: var(--error-bg);
       padding: 10px;
       border-radius: 4px;
       margin-bottom: 10px;
