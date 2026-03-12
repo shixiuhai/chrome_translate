@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>翻译插件</title>
+  <style>
+    body {
+      width: 350px;
+      padding: 15px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      background-color: #fff;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+    .settings-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .settings-btn:hover {
+      background-color: #f0f0f0;
+    }
+    .language-selectors {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .language-selector {
+      flex: 1;
+    }
+    .language-selector label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .language-selector select {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      background-color: #fff;
+    }
+    .swap-btn {
+      align-self: flex-end;
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 6px 8px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 1px;
+      transition: all 0.2s;
+    }
+    .swap-btn:hover {
+      background-color: #f0f0f0;
+      border-color: #ccc;
+    }
+    .input-area {
+      margin-bottom: 15px;
+    }
+    .input-area textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      resize: vertical;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    .input-area textarea:focus {
+      outline: none;
+      border-color: #4285f4;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+    }
+    .translate-btn {
+      width: 100%;
+      padding: 10px;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 15px;
+      transition: background-color 0.2s;
+    }
+    .translate-btn:hover {
+      background-color: #3367d6;
+    }
+    .translate-btn:disabled {
+      background-color: #90baf9;
+      cursor: not-allowed;
+    }
+    .result-area {
+      background-color: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 10px;
+      min-height: 60px;
+      margin-bottom: 15px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .result-area:empty::before {
+      content: '翻译结果将显示在这里';
+      color: #999;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .action-btn {
+      flex: 1;
+      padding: 8px;
+      background-color: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .action-btn:hover {
+      background-color: #e0e0e0;
+    }
+    .loading {
+      text-align: center;
+      padding: 10px;
+      color: #666;
+      display: none;
+    }
+    .error {
+      color: #c5221f;
+      background-color: #fce8e6;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      display: none;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">LibreTranslate 翻译</div>
+    <button class="settings-btn" id="settingsBtn" title="打开设置">⚙️</button>
+  </div>
+
+  <div class="language-selectors">
+    <div class="language-selector">
+      <label>源语言</label>
+      <select id="sourceLang">
+        <option value="auto">自动检测</option>
+      </select>
+    </div>
+    <button class="swap-btn" id="swapBtn" title="交换语言">⇄</button>
+    <div class="language-selector">
+      <label>目标语言</label>
+      <select id="targetLang">
+        <option value="zh">中文</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <textarea id="sourceText" placeholder="请输入要翻译的文本..."></textarea>
+  </div>
+
+  <button class="translate-btn" id="translateBtn">翻译</button>
+
+  <div class="loading" id="loading">翻译中...</div>
+  <div class="error" id="error"></div>
+
+  <div class="result-area" id="resultArea"></div>
+
+  <div class="action-buttons">
+    <button class="action-btn" id="translatePageBtn">翻译整个页面</button>
+    <button class="action-btn" id="copyBtn">复制结果</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

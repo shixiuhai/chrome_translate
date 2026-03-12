@@ -1,0 +1,50 @@
+/* 内容脚本样式 */
+#libretranslate-popup {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+#libretranslate-notification {
+  animation: slideIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 翻译后的文本样式 */
+.translated-text {
+  position: relative;
+}
+
+.translated-text:hover::after {
+  content: attr(data-original);
+  position: absolute;
+  background: #333;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  bottom: 100%;
+  left: 0;
+  white-space: nowrap;
+  z-index: 99999;
+  margin-bottom: 4px;
+}
