@@ -283,6 +283,8 @@ function cancelTranslation() {
     restoreOriginalPageInternal();
     hideProgress();
     isTranslating = false;
+    // 清空原始文本 Map，避免取消后再次触发自动翻译
+    originalTexts.clear();
     showNotification('翻译已取消', 'info');
   }, 300);
 }
@@ -476,6 +478,8 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
       restoreOriginalPageInternal();
       hideProgress();
       isTranslating = false;
+      // 清空原始文本 Map，避免取消后再次触发自动翻译
+      originalTexts.clear();
       showNotification('翻译已取消', 'info');
       console.log('=== 翻译已取消 ===');
       return;
