@@ -188,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function showStatus(message, type) {
     statusDiv.textContent = message;
     statusDiv.className = `status ${type}`;
+    // 清除之前可能设置的 display: none 样式
+    statusDiv.style.display = 'block';
     
     // 3 秒后自动隐藏成功消息
     if (type === 'success') {
