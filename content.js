@@ -191,17 +191,38 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
 
   const popup = document.createElement('div');
   popup.id = 'libretranslate-popup';
+  
+  // 计算弹窗位置，确保在视口内
+  const popupMaxWidth = 400;
+  const popupMaxHeight = 300;
+  const margin = 10;
+  
+  let top = rect.bottom + window.scrollY + margin;
+  let left = rect.left + window.scrollX;
+  
+  // 调整水平位置，避免超出右边界
+  if (left + popupMaxWidth > window.innerWidth + window.scrollX) {
+    left = Math.max(margin, window.innerWidth + window.scrollX - popupMaxWidth - margin);
+  }
+  
+  // 调整垂直位置，如果下方空间不足则显示在选中文本上方
+  if (top + popupMaxHeight > window.innerHeight + window.scrollY) {
+    top = Math.max(margin, rect.top + window.scrollY - popupMaxHeight - margin);
+  }
+
   popup.style.cssText = `
     position: fixed;
-    top: ${rect.bottom + window.scrollY + 10}px;
-    left: ${rect.left + window.scrollX}px;
+    top: ${top}px;
+    left: ${left}px;
     background: white;
     border: 1px solid #ddd;
     border-radius: 8px;
     padding: 12px 16px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     z-index: 999999;
-    max-width: 400px;
+    max-width: ${popupMaxWidth}px;
+    max-height: ${popupMaxHeight}px;
+    overflow-y: auto;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 14px;
     line-height: 1.5;
