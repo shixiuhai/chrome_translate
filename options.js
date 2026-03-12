@@ -10,6 +10,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadingDiv = document.getElementById('loading');
   const autoTranslateCheckbox = document.getElementById('autoTranslate');
   const autoTranslateLanguagesInput = document.getElementById('autoTranslateLanguages');
+  const shortcut1ActionSelect = document.getElementById('shortcut1Action');
+  const shortcut1TargetSelect = document.getElementById('shortcut1Target');
+  const shortcut2ActionSelect = document.getElementById('shortcut2Action');
+  const shortcut2TargetSelect = document.getElementById('shortcut2Target');
 
   // 加载已保存的设置
   loadSettings();
@@ -22,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 加载设置
   function loadSettings() {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages'], (result) => {
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target'], (result) => {
       if (result.apiUrl) {
         apiUrlInput.value = result.apiUrl;
         loadLanguages(result.apiUrl, result.apiKey).then(() => {
@@ -45,6 +49,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       autoTranslateCheckbox.checked = result.autoTranslate || false;
       autoTranslateLanguagesInput.value = result.autoTranslateLanguages ? result.autoTranslateLanguages.join(',') : '';
+
+      // 加载快捷键配置
+      if (result.shortcut1Action) {
+        shortcut1ActionSelect.value = result.shortcut1Action;
+      }
+      if (result.shortcut1Target) {
+        shortcut1TargetSelect.value = result.shortcut1Target;
+      }
+      if (result.shortcut2Action) {
+        shortcut2ActionSelect.value = result.shortcut2Action;
+      }
+      if (result.shortcut2Target) {
+        shortcut2TargetSelect.value = result.shortcut2Target;
+      }
     });
   }
 
@@ -96,6 +114,10 @@ document.addEventListener('DOMContentLoaded', () => {
       .split(',')
       .map(lang => lang.trim())
       .filter(lang => lang);
+    const shortcut1Action = shortcut1ActionSelect.value;
+    const shortcut1Target = shortcut1TargetSelect.value;
+    const shortcut2Action = shortcut2ActionSelect.value;
+    const shortcut2Target = shortcut2TargetSelect.value;
 
     if (!apiUrl) {
       showStatus('请填写 API 地址', 'error');
@@ -108,7 +130,11 @@ document.addEventListener('DOMContentLoaded', () => {
       defaultSource,
       defaultTarget,
       autoTranslate,
-      autoTranslateLanguages
+      autoTranslateLanguages,
+      shortcut1Action,
+      shortcut1Target,
+      shortcut2Action,
+      shortcut2Target
     }, () => {
       showStatus('设置保存成功', 'success');
       // 重新加载语言列表

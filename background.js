@@ -1,14 +1,20 @@
 // 背景服务 Worker
 chrome.runtime.onInstalled.addListener(() => {
   // 初始化默认配置
-  chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages'], (result) => {
+  chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target'], (result) => {
     const defaults = {
       apiUrl: 'https://libretranslate.de',
       apiKey: '',
       defaultSource: 'auto',
       defaultTarget: 'zh',
       autoTranslate: false,
-      autoTranslateLanguages: ['en']
+      autoTranslateLanguages: ['en'],
+      // 快捷键 1 默认配置：翻译选中文本
+      shortcut1Action: 'translateSelection',
+      shortcut1Target: 'zh',
+      // 快捷键 2 默认配置：翻译整页
+      shortcut2Action: 'translatePage',
+      shortcut2Target: 'zh'
     };
     
     chrome.storage.local.set({
@@ -153,28 +159,37 @@ async function getSupportedLanguages() {
 
 // 快捷键命令监听
 chrome.commands.onCommand.addListener(async (command, tab) => {
-  if (command === 'translate-selection') {
+  const settings = await getSettings();
+  
+  if (command === 'shortcut-1') {
+    const action = settings.shortcut1Action || 'translateSelection';
+    const target = settings.shortcut1Target || 'zh';
     chrome.tabs.sendMessage(tab.id, {
-      action: 'translateSelection',
+      action: action,
       data: {
         source: 'auto',
-        target: 'zh'
+        target: target
       }
     });
-  } else if (command === 'translate-page') {
+  } else if (command === 'shortcut-2') {
+    const action = settings.shortcut2Action || 'translatePage';
+    const target = settings.shortcut2Target || 'zh';
     chrome.tabs.sendMessage(tab.id, {
-      action: 'translatePage',
+      action: action,
       data: {
         source: 'auto',
-        target: 'zh'
+        target: target
       }
     });
+  } else if (command === '_execute_action') {
+    // 打开弹出窗口
+    chrome.action.openPopup();
   }
 });
 
 // 获取存储的设置
 function getSettings() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages'], resolve);
+    chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslate', 'autoTranslateLanguages', 'shortcut1Action', 'shortcut1Target', 'shortcut2Action', 'shortcut2Target'], resolve);
   });
 }

@@ -33,19 +33,26 @@
     "service_worker": "background.js"
   },
   "commands": {
-    "translate-selection": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+X",
+        "mac": "Command+Shift+X"
+      },
+      "description": "打开弹出窗口"
+    },
+    "shortcut-1": {
       "suggested_key": {
         "default": "Ctrl+Shift+T",
         "mac": "Command+Shift+T"
       },
-      "description": "翻译选中的文本"
+      "description": "自定义快捷键 1"
     },
-    "translate-page": {
+    "shortcut-2": {
       "suggested_key": {
         "default": "Ctrl+Shift+Y",
         "mac": "Command+Shift+Y"
       },
-      "description": "翻译整个页面"
+      "description": "自定义快捷键 2"
     }
   },
   "icons": {
