@@ -110,6 +110,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true; // 保持端口开放以进行异步响应
       
+    case 'detectLanguage':
+      detectLanguage(request.data)
+        .then(result => sendResponse({ success: true, data: result }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+      
     case 'getLanguages':
       getSupportedLanguages()
         .then(languages => sendResponse({ success: true, data: languages }))
@@ -159,6 +165,45 @@ async function handleTranslation({ q, source, target, format = 'text' }) {
     return result;
   } catch (error) {
     throw new Error(`翻译失败：${error.message}`);
+  }
+}
+
+// 语言检测函数 - 使用专门的 /detect 端点
+async function detectLanguage({ q }) {
+  const settings = await getSettings();
+  
+  if (!settings.apiUrl) {
+    throw new Error('请先配置翻译 API 地址');
+  }
+
+  // 使用 FormData 发送检测请求
+  const formData = new FormData();
+  formData.append('q', q);
+  
+  if (settings.apiKey) {
+    formData.append('api_key', settings.apiKey);
+  }
+
+  try {
+    const response = await fetch(`${settings.apiUrl.replace(/\/$/, '')}/detect`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(10000)  // 10 秒超时
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || `语言检测失败：${response.status}`);
+    }
+
+    const result = await response.json();
+    // 返回置信度最高的语言
+    if (Array.isArray(result) && result.length > 0) {
+      return { detectedLanguage: result[0] };
+    }
+    return { detectedLanguage: result };
+  } catch (error) {
+    throw new Error(`语言检测失败：${error.message}`);
   }
 }
 

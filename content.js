@@ -3,6 +3,8 @@ let originalTexts = new Map(); // 存储原始文本，用于回退
 let isTranslating = false;
 let currentTranslationTarget = 'zh-Hans';
 let translationObserver = null;
+let cancelTranslationFlag = false; // 取消翻译标志
+let translationAbortController = null; // 用于中断翻译请求
 
 // 翻译配置 - 优化以提高成功率
 const TRANSLATION_CONFIG = {
@@ -162,6 +164,7 @@ function showProgress(total) {
   }
 
   translationProgress = { total, completed: 0, failed: 0 };
+  cancelTranslationFlag = false; // 重置取消标志
 
   progressOverlay = document.createElement('div');
   progressOverlay.id = 'translation-progress';
@@ -194,10 +197,23 @@ function showProgress(total) {
       <div id="progress-text" style="font-size: 14px; color: ${isDarkMode ? '#aaa' : '#666'};">
         0 / ${total} (0%)
       </div>
+      <div id="cancel-button-container" style="margin-top: 16px;">
+        <button id="cancel-translation-btn" style="background: #dc3545; color: white; border: none; border-radius: 6px; padding: 8px 20px; font-size: 14px; cursor: pointer; transition: background 0.2s;">
+          取消翻译
+        </button>
+      </div>
     </div>
   `;
 
   document.body.appendChild(progressOverlay);
+
+  // 绑定取消按钮事件
+  const cancelBtn = progressOverlay.querySelector('#cancel-translation-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      cancelTranslation();
+    });
+  }
 }
 
 // 更新进度条
@@ -231,13 +247,93 @@ function hideProgress() {
   }
 }
 
+// 取消翻译函数
+function cancelTranslation() {
+  if (!isTranslating) {
+    return;
+  }
+  
+  console.log('[取消翻译] 用户请求取消翻译');
+  
+  // 设置取消标志
+  cancelTranslationFlag = true;
+  
+  // 中断正在进行的翻译请求
+  if (translationAbortController) {
+    translationAbortController.abort();
+    translationAbortController = null;
+  }
+  
+  // 更新进度条显示取消状态
+  if (progressOverlay) {
+    const progressTitle = progressOverlay.querySelector('#progress-title');
+    const cancelBtn = progressOverlay.querySelector('#cancel-translation-btn');
+    if (progressTitle) {
+      progressTitle.textContent = '正在取消...';
+    }
+    if (cancelBtn) {
+      cancelBtn.disabled = true;
+      cancelBtn.style.background = '#6c757d';
+      cancelBtn.textContent = '取消中...';
+    }
+  }
+  
+  // 延迟一点后恢复页面并隐藏进度条
+  setTimeout(() => {
+    restoreOriginalPageInternal();
+    hideProgress();
+    isTranslating = false;
+    showNotification('翻译已取消', 'info');
+  }, 300);
+}
+
+// 内部恢复函数（不显示通知）
+function restoreOriginalPageInternal() {
+  if (originalTexts.size === 0) {
+    return;
+  }
+
+  try {
+    // 保存当前滚动位置
+    const scrollY = window.scrollY;
+    
+    originalTexts.forEach((originalText, node) => {
+      if (node && node.parentNode && document.body.contains(node)) {
+        // 直接恢复文本节点内容
+        node.textContent = originalText;
+      }
+    });
+    
+    // 停止动态内容监听
+    if (translationObserver) {
+      translationObserver.disconnect();
+      translationObserver = null;
+    }
+    
+    // 恢复滚动位置
+    window.scrollTo(0, scrollY);
+  } catch (error) {
+    console.error('还原失败:', error);
+  }
+}
+
 // 翻译单个批次 - 使用 HTML 格式批量翻译
 async function translateBatch(batch, source, target, config, batchIndex, totalBatches) {
+  // 检查是否已取消
+  if (cancelTranslationFlag) {
+    return { success: false, error: 'cancelled' };
+  }
+  
   let retries = 0;
   let lastError = null;
 
   while (retries <= config.retryTimes) {
     try {
+      // 检查取消标志
+      if (cancelTranslationFlag) {
+        return { success: false, error: 'cancelled' };
+      }
+      
       // 更新进度条显示重试状态
       if (retries > 0 && progressOverlay) {
         const progressTitle = progressOverlay.querySelector('#progress-title');
@@ -331,31 +427,33 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
 
   isTranslating = true;
   currentTranslationTarget = target;
+  cancelTranslationFlag = false; // 重置取消标志
 
   console.log('=== 开始纯文本节点翻译 ===');
   console.log('源语言:', source, '目标语言:', target);
 
   try {
-    // 步骤1：收集所有文本节点
-    console.log('=== 步骤1: 收集文本节点 ===');
+    // 步骤 1：收集所有文本节点
+    console.log('=== 步骤 1: 收集文本节点 ===');
     const textNodes = collectTextNodes();
     console.log(`找到 ${textNodes.length} 个可翻译文本节点`);
 
     if (textNodes.length === 0) {
       showNotification('页面中没有可翻译的内容', 'info');
+      isTranslating = false;
       return;
     }
 
-    // 步骤2：分组
-    console.log('=== 步骤2: 分组形成翻译批次 ===');
+    // 步骤 2：分组
+    console.log('=== 步骤 2: 分组形成翻译批次 ===');
     const batches = groupTextNodesIntoBatches(textNodes, TRANSLATION_CONFIG);
     console.log(`形成 ${batches.length} 个翻译批次`);
 
     // 显示进度
     showProgress(batches.length);
 
-    // 步骤3：并发翻译
-    console.log('=== 步骤3: 并发翻译批次 ===');
+    // 步骤 3：并发翻译
+    console.log('=== 步骤 3: 并发翻译批次 ===');
     const controller = new ConcurrencyController(TRANSLATION_CONFIG.concurrency);
     const results = await Promise.all(batches.map((batch, index) =>
       controller.run(async () => {
@@ -363,7 +461,7 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
         
         if (result.success) {
           translationProgress.completed++;
-        } else {
+        } else if (result.error !== 'cancelled') {
           translationProgress.failed++;
         }
         
@@ -372,11 +470,22 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
       })
     ));
 
+    // 检查是否被取消
+    if (cancelTranslationFlag) {
+      // 取消后恢复页面
+      restoreOriginalPageInternal();
+      hideProgress();
+      isTranslating = false;
+      showNotification('翻译已取消', 'info');
+      console.log('=== 翻译已取消 ===');
+      return;
+    }
+
     // 隐藏进度条
     hideProgress();
 
-    // 步骤4：显示完成状态
-    console.log('=== 步骤4: 显示完成状态 ===');
+    // 步骤 4：显示完成状态
+    console.log('=== 步骤 4: 显示完成状态 ===');
     const successCount = results.filter(r => r.success).length;
     const failedCount = results.length - successCount;
     
@@ -392,10 +501,12 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
     console.log('=== 纯文本节点翻译完成 ===');
   } catch (error) {
     console.error('翻译过程出错:', error);
-    showNotification(`翻译失败: ${error.message}`, 'error');
+    showNotification(`翻译失败：${error.message}`, 'error');
     hideProgress();
   } finally {
-    isTranslating = false;
+    if (!cancelTranslationFlag) {
+      isTranslating = false;
+    }
   }
 }
 
@@ -434,13 +545,13 @@ function restoreOriginalPage() {
     showNotification('页面已还原到原始状态');
   } catch (error) {
     console.error('还原失败:', error);
-    showNotification(`还原失败: ${error.message}`, 'error');
+    showNotification(`还原失败：${error.message}`, 'error');
   }
 }
 
 // 监听动态内容变化，翻译新加载的内容
 function startDynamicContentObserver() {
-  // 如果已有observer，先断开
+  // 如果已有 observer，先断开
   if (translationObserver) {
     translationObserver.disconnect();
   }
@@ -478,7 +589,7 @@ function startDynamicContentObserver() {
     }
   });
   
-  // 开始监听body的变化
+  // 开始监听 body 的变化
   try {
     translationObserver.observe(document.body, {
       childList: true,
@@ -515,10 +626,10 @@ async function translateSelection(source = 'auto', target = 'zh-Hans') {
     if (response.success) {
       showTranslationPopup(selection, response.data.translatedText, source, target);
     } else {
-      showNotification(`翻译失败: ${response.error}`, 'error');
+      showNotification(`翻译失败：${response.error}`, 'error');
     }
   } catch (error) {
-    showNotification(`翻译失败: ${error.message}`, 'error');
+    showNotification(`翻译失败：${error.message}`, 'error');
   }
 }
 
@@ -549,7 +660,7 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
   const popup = document.createElement('div');
   popup.id = 'libretranslate-popup';
   
-  // 计算弹窗位置，确保在视口内 - 使用正确的fixed定位计算
+  // 计算弹窗位置，确保在视口内 - 使用正确的 fixed 定位计算
   const popupMaxWidth = 400;
   const popupMaxHeight = 300;
   const margin = 10;
@@ -677,10 +788,10 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
         }
         showNotification('翻译完成');
       } else {
-        showNotification(`翻译失败: ${response.error}`, 'error');
+        showNotification(`翻译失败：${response.error}`, 'error');
       }
     } catch (error) {
-      showNotification(`翻译失败: ${error.message}`, 'error');
+      showNotification(`翻译失败：${error.message}`, 'error');
     }
     
     // 重置选择
@@ -699,7 +810,7 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
     document.addEventListener('click', clickHandler, { once: true });
   }, 100);
   
-  // 添加ESC键关闭功能
+  // 添加 ESC 键关闭功能
   const escHandler = (e) => {
     if (e.key === 'Escape') {
       popup.remove();
@@ -709,14 +820,14 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
   document.addEventListener('keydown', escHandler, { once: true });
 }
 
-// HTML转义函数，防止XSS
+// HTML 转义函数，防止 XSS
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
-// 显示通知 - 修复z-index和暗色主题
+// 显示通知 - 修复 z-index 和暗色主题
 function showNotification(message, type = 'info') {
   // 移除之前的通知
   const oldNotification = document.getElementById('libretranslate-notification');
@@ -823,19 +934,20 @@ async function checkAutoTranslate(settings) {
 
     console.log('[自动翻译] 正在检测页面语言...');
     const detectResponse = await chrome.runtime.sendMessage({
-      action: 'translate',
+      action: 'detectLanguage',
       data: {
-        q: pageText,
-        source: 'auto',
-        target: settings.defaultTarget,
-        format: 'text'
+        q: pageText
       }
     });
 
     console.log('[自动翻译] 语言检测结果:', detectResponse);
     
     if (detectResponse.success && detectResponse.data.detectedLanguage) {
-      const detectedLang = detectResponse.data.detectedLanguage.language;
+      // 处理数组或对象格式的检测结果
+      const detectedLangData = Array.isArray(detectResponse.data.detectedLanguage)
+        ? detectResponse.data.detectedLanguage[0]
+        : detectResponse.data.detectedLanguage;
+      const detectedLang = detectedLangData?.language;
       
       // 检查是否需要自动翻译
       let shouldTranslate = false;
