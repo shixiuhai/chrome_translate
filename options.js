@@ -73,7 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadLanguages(apiUrl, apiKey) {
     try {
       showLoading(true);
-      const response = await fetch(`${apiUrl.replace(/\/$/, '')}/languages`);
+      const response = await fetch(`${apiUrl.replace(/\/$/, '')}/languages`, {
+        signal: AbortSignal.timeout(10000) // 10秒超时
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -204,7 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const translateResponse = await fetch(`${apiUrl.replace(/\/$/, '')}/translate`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: AbortSignal.timeout(10000) // 10秒超时
       });
 
       if (!translateResponse.ok) {

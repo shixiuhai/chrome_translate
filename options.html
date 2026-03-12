@@ -10,9 +10,11 @@
       --text-color: #333333;
       --text-secondary: #555555;
       --text-hint: #666666;
+      --primary-color: #4285f4;
       --border-color: #dddddd;
       --input-bg: #ffffff;
       --shadow: 0 2px 10px rgba(0,0,0,0.1);
+      --card-bg: #f9f9f9;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -22,9 +24,11 @@
         --text-color: #ffffff;
         --text-secondary: #cccccc;
         --text-hint: #999999;
+        --primary-color: #64b5f6;
         --border-color: #333333;
         --input-bg: #2d2d2d;
         --shadow: 0 2px 10px rgba(0,0,0,0.3);
+        --card-bg: #2a2a2a;
       }
     }
 
@@ -131,6 +135,81 @@
       color: #666;
       display: none;
     }
+
+    .form-section {
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .form-section h3 {
+      margin: 0 0 15px 0;
+      font-size: 18px;
+      color: var(--text-color);
+      font-weight: 600;
+    }
+
+    .shortcut-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+
+    .shortcut-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .shortcut-name {
+      font-weight: 500;
+      font-size: 15px;
+      color: var(--text-color);
+    }
+
+    .shortcut-key {
+      background: var(--primary-color);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .shortcut-config {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .action-select {
+      flex: 1;
+    }
+
+    .target-select {
+      width: 120px;
+    }
+
+    .shortcut-info {
+      background: var(--input-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    a {
+      color: var(--primary-color);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -149,18 +228,20 @@
       <div class="hint">如果你的 LibreTranslate 服务需要 API 认证，请在此填写</div>
     </div>
     
-    <div class="form-group">
-      <label for="defaultSource">默认源语言</label>
-      <select id="defaultSource">
-        <option value="auto">自动检测</option>
-      </select>
-    </div>
-    
-    <div class="form-group">
-      <label for="defaultTarget">默认目标语言</label>
-      <select id="defaultTarget">
-        <option value="zh-Hans">中文（简体）</option>
-      </select>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      <div class="form-group" style="margin: 0;">
+        <label for="defaultSource">默认源语言</label>
+        <select id="defaultSource">
+          <option value="auto">自动检测</option>
+        </select>
+      </div>
+      
+      <div class="form-group" style="margin: 0;">
+        <label for="defaultTarget">默认目标语言</label>
+        <select id="defaultTarget">
+          <option value="zh-Hans">中文（简体）</option>
+        </select>
+      </div>
     </div>
 
     <div class="form-group">
@@ -183,40 +264,55 @@
       <div class="hint">逗号分隔的网站域名，这些网站不会自动翻译</div>
     </div>
 
-    <div class="form-group">
-      <label>快捷键 1 (默认：Ctrl+Shift+T / Cmd+Shift+T)</label>
-      <div style="display: flex; gap: 10px; margin-bottom: 8px;">
-        <select id="shortcut1Action" style="flex: 1;">
-          <option value="translateSelection">翻译选中文本</option>
-          <option value="translatePage">翻译整个页面</option>
-          <option value="restoreOriginalPage">还原页面原文</option>
-        </select>
-        <select id="shortcut1Target" style="width: 120px;">
-        </select>
+    <div class="form-section">
+      <h3>快捷键设置</h3>
+      
+      <div class="shortcut-item">
+        <div class="shortcut-header">
+          <span class="shortcut-name">快捷键 1</span>
+          <code class="shortcut-key">Ctrl+Shift+T / Cmd+Shift+T</code>
+        </div>
+        <div class="shortcut-config">
+          <select id="shortcut1Action" class="action-select">
+            <option value="translateSelection">翻译选中文本</option>
+            <option value="translatePage">翻译整个页面</option>
+            <option value="restoreOriginalPage">还原页面原文</option>
+          </select>
+          <select id="shortcut1Target" class="target-select">
+          </select>
+        </div>
+        <div class="hint">选择快捷键触发的功能和目标语言</div>
       </div>
-      <div class="hint">选择快捷键 1 触发的功能和目标语言</div>
-    </div>
 
-    <div class="form-group">
-      <label>快捷键 2 (默认：Ctrl+Shift+Y / Cmd+Shift+Y)</label>
-      <div style="display: flex; gap: 10px; margin-bottom: 8px;">
-        <select id="shortcut2Action" style="flex: 1;">
-          <option value="translateSelection">翻译选中文本</option>
-          <option value="translatePage">翻译整个页面</option>
-          <option value="restoreOriginalPage">还原页面原文</option>
-        </select>
-        <select id="shortcut2Target" style="width: 120px;">
-        </select>
+      <div class="shortcut-item">
+        <div class="shortcut-header">
+          <span class="shortcut-name">快捷键 2</span>
+          <code class="shortcut-key">Ctrl+Shift+Y / Cmd+Shift+Y</code>
+        </div>
+        <div class="shortcut-config">
+          <select id="shortcut2Action" class="action-select">
+            <option value="translateSelection">翻译选中文本</option>
+            <option value="translatePage">翻译整个页面</option>
+            <option value="restoreOriginalPage">还原页面原文</option>
+          </select>
+          <select id="shortcut2Target" class="target-select">
+          </select>
+        </div>
+        <div class="hint">选择快捷键触发的功能和目标语言</div>
       </div>
-      <div class="hint">选择快捷键 2 触发的功能和目标语言</div>
-    </div>
 
-    <div class="form-group">
-      <label>弹出窗口快捷键 (默认：Ctrl+Shift+X / Cmd+Shift+X)</label>
-      <div style="padding: 12px; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px;">
-        <div>按下快捷键可快速打开插件弹出窗口</div>
-        <div class="hint" style="margin-top: 8px;">
-          如需修改快捷键组合，请打开 Chrome 扩展管理页面 (chrome://extensions/shortcuts) 进行配置。
+      <div class="shortcut-item">
+        <div class="shortcut-header">
+          <span class="shortcut-name">弹出窗口</span>
+          <code class="shortcut-key">Ctrl+Shift+X / Cmd+Shift+X</code>
+        </div>
+        <div class="shortcut-info">
+          <p>按下快捷键可快速打开插件弹出窗口</p>
+          <p class="hint" style="margin: 8px 0 0 0;">
+            如需修改快捷键组合，请打开 Chrome 扩展管理页面
+            <a href="chrome://extensions/shortcuts" target="_blank" style="color: var(--primary-color); text-decoration: none;">chrome://extensions/shortcuts</a>
+            进行配置。
+          </p>
         </div>
       </div>
     </div>

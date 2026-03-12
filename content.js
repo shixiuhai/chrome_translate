@@ -3,24 +3,6 @@ let originalTexts = new Map();
 let isTranslating = false;
 let currentTranslationTarget = 'zh-Hans';
 
-// 监听来自扩展的消息
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  switch (request.action) {
-    case 'translatePage':
-      translateEntirePage(request.data.source, request.data.target);
-      sendResponse({ success: true });
-      break;
-    case 'translateSelection':
-      translateSelection(request.data.source, request.data.target);
-      sendResponse({ success: true });
-      break;
-    case 'restoreOriginalPage':
-      restoreOriginalPage();
-      sendResponse({ success: true });
-      break;
-  }
-  return true;
-});
 
 // 翻译整个页面
 async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
@@ -42,13 +24,20 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
         acceptNode: function(node) {
           // 跳过不需要翻译的元素
           const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          
+          const tagName = parent.tagName.toUpperCase();
           if (
-            parent.tagName === 'SCRIPT' || 
-            parent.tagName === 'STYLE' || 
-            parent.tagName === 'NOSCRIPT' ||
-            parent.tagName === 'IFRAME' ||
+            tagName === 'SCRIPT' ||
+            tagName === 'STYLE' ||
+            tagName === 'NOSCRIPT' ||
+            tagName === 'IFRAME' ||
+            tagName === 'INPUT' ||
+            tagName === 'TEXTAREA' ||
+            tagName === 'BUTTON' ||
+            tagName === 'SELECT' ||
             parent.isContentEditable ||
-            node.textContent.trim().length < 2 ||
+            node.textContent.trim().length < 1 || // 调整为长度小于1才跳过，避免跳过短文本
             /^\d+$/.test(node.textContent.trim()) // 跳过纯数字
           ) {
             return NodeFilter.FILTER_REJECT;
@@ -93,12 +82,17 @@ async function translateEntirePage(source = 'auto', target = 'zh-Hans') {
               originalTexts.set(item.node, item.text);
             }
             if (translations[index]) {
-              item.node.textContent = translations[index];
+              // 保留原文本的前后空白字符
+              const originalNodeText = item.node.textContent;
+              const leadingWhitespace = originalNodeText.match(/^\s*/)[0];
+              const trailingWhitespace = originalNodeText.match(/\s*$/)[0];
+              item.node.textContent = leadingWhitespace + translations[index] + trailingWhitespace;
             }
           });
         }
       } catch (error) {
         console.error('批量翻译失败:', error);
+        showNotification(`批量翻译失败: ${error.message}`, 'error');
       }
 
       // 更新进度
@@ -199,7 +193,15 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
     font-size: 14px;
     line-height: 1.5;
     color: #333;
+    user-select: text;
   `;
+
+  // 适配暗色主题
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    popup.style.background = '#1e1e1e';
+    popup.style.borderColor = '#3e3e3e';
+    popup.style.color = '#fff';
+  }
 
   popup.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -315,7 +317,14 @@ function showNotification(message, type = 'info') {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 14px;
     max-width: 300px;
+    user-select: none;
   `;
+
+  // 适配暗色主题
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    notification.style.background = type === 'error' ? '#4a1f1f' : '#1f4a2f';
+    notification.style.color = type === 'error' ? '#ff8a8a' : '#8affa8';
+  }
   
   notification.textContent = message;
   
@@ -328,10 +337,32 @@ function showNotification(message, type = 'info') {
   }, 3000);
 }
 
-// 监听自动翻译检查
+// 合并消息监听器，避免重复注册
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'autoTranslateCheck') {
-    checkAutoTranslate(request.data);
+  switch (request.action) {
+    case 'translatePage':
+      translateEntirePage(request.data.source, request.data.target);
+      sendResponse({ success: true });
+      break;
+    case 'translateSelection':
+      translateSelection(request.data.source, request.data.target);
+      sendResponse({ success: true });
+      break;
+    case 'restoreOriginalPage':
+      restoreOriginalPage();
+      sendResponse({ success: true });
+      break;
+    case 'autoTranslateCheck':
+      checkAutoTranslate(request.data);
+      sendResponse({ success: true });
+      break;
+    case 'getSelectedText':
+      const selection = window.getSelection();
+      const text = selection.toString().trim();
+      sendResponse({ success: true, text });
+      break;
+    default:
+      sendResponse({ success: false, error: '未知操作' });
   }
   return true;
 });
@@ -368,7 +399,8 @@ async function checkAutoTranslate(settings) {
 
       if (shouldTranslate) {
         showNotification(`检测到${detectedLang}语言，正在自动翻译...`);
-        translateEntirePage('auto', settings.defaultTarget);
+        // 使用检测到的源语言进行翻译，提高翻译准确率
+        translateEntirePage(detectedLang, settings.defaultTarget);
       }
     }
   } catch (error) {

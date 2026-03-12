@@ -118,7 +118,12 @@ async function handleTranslation({ q, source, target, format = 'text' }) {
   }
 
   const formData = new FormData();
-  formData.append('q', q);
+  // 支持数组和字符串两种格式的q参数
+  if (Array.isArray(q)) {
+    q.forEach(text => formData.append('q', text));
+  } else {
+    formData.append('q', q);
+  }
   formData.append('source', source || settings.defaultSource || 'auto');
   formData.append('target', target || settings.defaultTarget || 'zh-Hans');
   formData.append('format', format);
@@ -130,7 +135,8 @@ async function handleTranslation({ q, source, target, format = 'text' }) {
   try {
     const response = await fetch(`${settings.apiUrl.replace(/\/$/, '')}/translate`, {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: AbortSignal.timeout(30000) // 30秒超时
     });
 
     if (!response.ok) {
@@ -154,7 +160,9 @@ async function getSupportedLanguages() {
   }
 
   try {
-    const response = await fetch(`${settings.apiUrl.replace(/\/$/, '')}/languages`);
+    const response = await fetch(`${settings.apiUrl.replace(/\/$/, '')}/languages`, {
+      signal: AbortSignal.timeout(10000) // 10秒超时
+    });
     
     if (!response.ok) {
       throw new Error(`获取语言列表失败: ${response.status}`);
