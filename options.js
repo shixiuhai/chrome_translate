@@ -81,8 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       showStatus('语言列表加载成功', 'success');
+      return Promise.resolve();
     } catch (error) {
       showStatus(`加载语言列表失败：${error.message}`, 'error');
+      return Promise.reject(error);
     } finally {
       showLoading(false);
     }
@@ -117,8 +119,12 @@ document.addEventListener('DOMContentLoaded', () => {
       autoTranslateExcludedSites
     }, () => {
       showStatus('设置保存成功', 'success');
-      // 重新加载语言列表
-      loadLanguages(apiUrl, apiKey);
+      // 重新加载语言列表并设置保存的值
+      loadLanguages(apiUrl, apiKey).then(() => {
+        // 确保在语言列表加载完成后设置保存的值
+        defaultSourceSelect.value = defaultSource;
+        defaultTargetSelect.value = defaultTarget;
+      });
     });
   }
 
