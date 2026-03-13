@@ -282,7 +282,26 @@ async function getSupportedLanguages() {
     }
 
     const languages = await response.json();
-    return languages;
+    
+    // 验证返回的数据格式是否正确
+    if (!Array.isArray(languages) || languages.length === 0) {
+      console.warn('API 返回的语言列表格式不正确，使用备用语言列表');
+      return FALLBACK_LANGUAGES;
+    }
+    
+    // 验证每个语言对象是否包含必要的字段
+    const validLanguages = languages.filter(lang =>
+      typeof lang === 'object' &&
+      lang.code &&
+      lang.name
+    );
+    
+    if (validLanguages.length === 0) {
+      console.warn('API 返回的语言列表中没有有效数据，使用备用语言列表');
+      return FALLBACK_LANGUAGES;
+    }
+    
+    return validLanguages;
   } catch (error) {
     // 发生错误时返回备用语言列表
     console.warn('获取语言列表失败:', error.message, '使用备用语言列表');

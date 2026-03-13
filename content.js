@@ -638,7 +638,7 @@ async function translateSelection(source = 'auto', target = 'zh-Hans') {
 }
 
 // 显示翻译弹窗 - 修复定位和显示问题
-function showTranslationPopup(selection, translatedText, source = 'auto', currentTarget = 'zh-Hans') {
+async function showTranslationPopup(selection, translatedText, source = 'auto', currentTarget = 'zh-Hans') {
   // 移除之前的弹窗
   const oldPopup = document.getElementById('libretranslate-popup');
   if (oldPopup) {
@@ -721,6 +721,7 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
     user-select: text;
   `;
 
+  // 先创建基本结构，稍后填充语言选项
   popup.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <strong style="color: #4285f4;">翻译结果</strong>
@@ -731,61 +732,38 @@ function showTranslationPopup(selection, translatedText, source = 'auto', curren
       <button id="libretranslate-copy" style="background: ${btnBgColor}; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: ${btnTextColor};">复制</button>
       <select id="libretranslate-switch-lang" style="background: ${btnBgColor}; border: none; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: ${btnTextColor};">
         <option value="">切换语言</option>
-        <option value="zh-Hans">中文（简体）</option>
-        <option value="zh-Hant">中文（繁体）</option>
-        <option value="ar">阿拉伯语</option>
-        <option value="az">阿塞拜疆语</option>
-        <option value="bg">保加利亚语</option>
-        <option value="bn">孟加拉语</option>
-        <option value="ca">加泰罗尼亚语</option>
-        <option value="cs">捷克语</option>
-        <option value="da">丹麦语</option>
-        <option value="de">德语</option>
-        <option value="el">希腊语</option>
-        <option value="en">英语</option>
-        <option value="eo">世界语</option>
-        <option value="es">西班牙语</option>
-        <option value="et">爱沙尼亚语</option>
-        <option value="eu">巴斯克语</option>
-        <option value="fa">波斯语</option>
-        <option value="fi">芬兰语</option>
-        <option value="fr">法语</option>
-        <option value="ga">爱尔兰语</option>
-        <option value="gl">加利西亚语</option>
-        <option value="he">希伯来语</option>
-        <option value="hi">印地语</option>
-        <option value="hu">匈牙利语</option>
-        <option value="id">印度尼西亚语</option>
-        <option value="it">意大利语</option>
-        <option value="ja">日语</option>
-        <option value="ko">韩语</option>
-        <option value="ky">吉尔吉斯语</option>
-        <option value="lt">立陶宛语</option>
-        <option value="lv">拉脱维亚语</option>
-        <option value="ms">马来语</option>
-        <option value="nb">挪威语</option>
-        <option value="nl">荷兰语</option>
-        <option value="pl">波兰语</option>
-        <option value="pt-BR">葡萄牙语（巴西）</option>
-        <option value="pt">葡萄牙语</option>
-        <option value="ro">罗马尼亚语</option>
-        <option value="ru">俄语</option>
-        <option value="sk">斯洛伐克语</option>
-        <option value="sl">斯洛文尼亚语</option>
-        <option value="sq">阿尔巴尼亚语</option>
-        <option value="sr">塞尔维亚语</option>
-        <option value="sv">瑞典语</option>
-        <option value="th">泰语</option>
-        <option value="tl">他加禄语</option>
-        <option value="tr">土耳其语</option>
-        <option value="uk">乌克兰语</option>
-        <option value="ur">乌尔都语</option>
-        <option value="vi">越南语</option>
       </select>
     </div>
   `;
 
   document.body.appendChild(popup);
+
+  // 动态加载语言列表
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'getLanguages'
+    });
+
+    if (response.success) {
+      const languages = response.data;
+      const langSelect = popup.querySelector('#libretranslate-switch-lang');
+      
+      // 清空现有选项
+      langSelect.innerHTML = '<option value="">切换语言</option>';
+      
+      // 添加语言选项
+      languages.forEach(lang => {
+        const option = document.createElement('option');
+        option.value = lang.code;
+        option.textContent = `${lang.name} (${lang.code})`;
+        langSelect.appendChild(option);
+      });
+    } else {
+      console.error('加载语言列表失败:', response.error);
+    }
+  } catch (error) {
+    console.error('获取语言列表失败:', error);
+  }
 
   // 关闭按钮
   popup.querySelector('#libretranslate-close').addEventListener('click', () => {

@@ -52,15 +52,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadLanguages(apiUrl, apiKey) {
     try {
       showLoading(true);
-      const response = await fetch(`${apiUrl.replace(/\/$/, '')}/languages`, {
-        signal: AbortSignal.timeout(10000) // 10 秒超时
+      // 使用 Chrome 扩展 API 发送消息到背景脚本获取语言列表
+      const response = await chrome.runtime.sendMessage({
+        action: 'getLanguages'
       });
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.success) {
+        throw new Error(response.error || '获取语言列表失败');
       }
 
-      const languages = await response.json();
+      const languages = response.data;
       
       // 清空现有选项
       defaultSourceSelect.innerHTML = '<option value="auto">自动检测</option>';
