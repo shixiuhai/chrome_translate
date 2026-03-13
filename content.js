@@ -773,7 +773,10 @@ async function showTranslationPopup(selection, translatedText, source = 'auto', 
   // 复制按钮
   popup.querySelector('#libretranslate-copy').addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(translatedText);
+      // 获取当前显示的翻译结果
+      const resultDiv = popup.querySelector('div[style*="white-space: pre-wrap"]');
+      const currentTranslatedText = resultDiv.textContent;
+      await navigator.clipboard.writeText(currentTranslatedText);
       const copyBtn = popup.querySelector('#libretranslate-copy');
       copyBtn.textContent = '已复制';
       setTimeout(() => {
