@@ -23,81 +23,33 @@ document.addEventListener('DOMContentLoaded', () => {
   // 加载设置
   function loadSettings() {
     chrome.storage.local.get(['apiUrl', 'apiKey', 'defaultSource', 'defaultTarget', 'autoTranslateLanguages', 'autoTranslateExcludedSites'], (result) => {
-      console.log('[options.js] 加载设置:', result);
       if (result.apiUrl) {
         apiUrlInput.value = result.apiUrl;
-        if (result.apiKey) {
-          apiKeyInput.value = result.apiKey;
-        }
-        autoTranslateLanguagesInput.value = result.autoTranslateLanguages ? result.autoTranslateLanguages.join(',') : '';
-        autoTranslateExcludedSitesInput.value = result.autoTranslateExcludedSites ? result.autoTranslateExcludedSites.join(',') : '';
-        
-        console.log('[options.js] 准备加载语言列表，默认源语言:', result.defaultSource, '默认目标语言:', result.defaultTarget);
-        // 加载语言列表，并传入已保存的默认值
-        loadLanguagesWithDefaults(result.apiUrl, result.apiKey, result.defaultSource, result.defaultTarget);
+        loadLanguages(result.apiUrl, result.apiKey).then(() => {
+          if (result.defaultSource) {
+            defaultSourceSelect.value = result.defaultSource;
+          }
+          if (result.defaultTarget) {
+            defaultTargetSelect.value = result.defaultTarget;
+          }
+        });
       } else {
         // 默认值
         apiUrlInput.value = 'https://libretranslate.de';
         loadLanguages('https://libretranslate.de', '');
       }
+      
+      if (result.apiKey) {
+        apiKeyInput.value = result.apiKey;
+      }
+
+      autoTranslateLanguagesInput.value = result.autoTranslateLanguages ? result.autoTranslateLanguages.join(',') : '';
+      autoTranslateExcludedSitesInput.value = result.autoTranslateExcludedSites ? result.autoTranslateExcludedSites.join(',') : '';
     });
-  }
-  
-  // 加载语言列表并设置默认值
-  function loadLanguagesWithDefaults(apiUrl, apiKey, defaultSource, defaultTarget) {
-    try {
-      showLoading(true);
-      fetch(`${apiUrl.replace(/\/$/, '')}/languages`, {
-        signal: AbortSignal.timeout(10000) // 10 秒超时
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(languages => {
-        // 清空现有选项
-        defaultSourceSelect.innerHTML = '<option value="auto">自动检测</option>';
-        defaultTargetSelect.innerHTML = '';
-        
-        // 添加语言选项
-        languages.forEach(lang => {
-          const option1 = document.createElement('option');
-          option1.value = lang.code;
-          option1.textContent = `${lang.name} (${lang.code})`;
-          defaultSourceSelect.appendChild(option1);
-          
-          const option2 = document.createElement('option');
-          option2.value = lang.code;
-          option2.textContent = `${lang.name} (${lang.code})`;
-          defaultTargetSelect.appendChild(option2);
-        });
-        
-        // 使用保存的值设置选中项
-        if (defaultSource) {
-          defaultSourceSelect.value = defaultSource;
-        }
-        if (defaultTarget) {
-          defaultTargetSelect.value = defaultTarget;
-        }
-        
-        showStatus('语言列表加载成功', 'success');
-      })
-      .catch(error => {
-        showStatus(`加载语言列表失败：${error.message}`, 'error');
-      })
-      .finally(() => {
-        showLoading(false);
-      });
-    } catch (error) {
-      showStatus(`加载语言列表失败：${error.message}`, 'error');
-      showLoading(false);
-    }
   }
 
   // 加载语言列表
-  async function loadLanguages(apiUrl, apiKey, keepSelection = false) {
+  async function loadLanguages(apiUrl, apiKey) {
     try {
       showLoading(true);
       const response = await fetch(`${apiUrl.replace(/\/$/, '')}/languages`, {
@@ -109,10 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const languages = await response.json();
-      
-      // 保存当前选中的值
-      const currentSource = keepSelection ? defaultSourceSelect.value : null;
-      const currentTarget = keepSelection ? defaultTargetSelect.value : null;
       
       // 清空现有选项
       defaultSourceSelect.innerHTML = '<option value="auto">自动检测</option>';
@@ -130,16 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
         option2.textContent = `${lang.name} (${lang.code})`;
         defaultTargetSelect.appendChild(option2);
       });
-
-      // 恢复选中的值
-      if (keepSelection) {
-        if (currentSource) {
-          defaultSourceSelect.value = currentSource;
-        }
-        if (currentTarget) {
-          defaultTargetSelect.value = currentTarget;
-        }
-      }
 
       showStatus('语言列表加载成功', 'success');
     } catch (error) {
@@ -164,8 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
       .map(site => site.trim())
       .filter(site => site);
 
-    console.log('[options.js] 准备保存设置:', { apiUrl, apiKey, defaultSource, defaultTarget, autoTranslateLanguages, autoTranslateExcludedSites });
-
     if (!apiUrl) {
       showStatus('请填写 API 地址', 'error');
       return;
@@ -179,69 +115,10 @@ document.addEventListener('DOMContentLoaded', () => {
       autoTranslateLanguages,
       autoTranslateExcludedSites
     }, () => {
-      console.log('[options.js] 设置已保存');
-      // 验证保存结果
-      chrome.storage.local.get(['defaultSource', 'defaultTarget'], (result) => {
-        console.log('[options.js] 验证保存结果:', result);
-      });
-      
       showStatus('设置保存成功', 'success');
-      // 重新加载语言列表，并在加载完成后从 storage 获取最新设置来设置选中值
-      loadLanguagesAfterSave(apiUrl, apiKey, defaultSource, defaultTarget);
+      // 重新加载语言列表
+      loadLanguages(apiUrl, apiKey);
     });
-  }
-  
-  // 保存设置后重新加载语言列表
-  function loadLanguagesAfterSave(apiUrl, apiKey, savedSource, savedTarget) {
-    try {
-      showLoading(true);
-      fetch(`${apiUrl.replace(/\/$/, '')}/languages`, {
-        signal: AbortSignal.timeout(10000) // 10 秒超时
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(languages => {
-        // 清空现有选项
-        defaultSourceSelect.innerHTML = '<option value="auto">自动检测</option>';
-        defaultTargetSelect.innerHTML = '';
-        
-        // 添加语言选项
-        languages.forEach(lang => {
-          const option1 = document.createElement('option');
-          option1.value = lang.code;
-          option1.textContent = `${lang.name} (${lang.code})`;
-          defaultSourceSelect.appendChild(option1);
-          
-          const option2 = document.createElement('option');
-          option2.value = lang.code;
-          option2.textContent = `${lang.name} (${lang.code})`;
-          defaultTargetSelect.appendChild(option2);
-        });
-        
-        // 使用保存的值设置选中项
-        if (savedSource) {
-          defaultSourceSelect.value = savedSource;
-        }
-        if (savedTarget) {
-          defaultTargetSelect.value = savedTarget;
-        }
-        
-        showStatus('语言列表加载成功', 'success');
-      })
-      .catch(error => {
-        showStatus(`加载语言列表失败：${error.message}`, 'error');
-      })
-      .finally(() => {
-        showLoading(false);
-      });
-    } catch (error) {
-      showStatus(`加载语言列表失败：${error.message}`, 'error');
-      showLoading(false);
-    }
   }
 
   // 测试连接

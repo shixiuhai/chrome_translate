@@ -25,8 +25,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 加载设置
     const settings = await getSettings();
     
-    // 加载语言列表并设置默认语言
-    await loadLanguages(settings);
+    // 加载语言列表
+    await loadLanguages();
+    
+    // 设置默认语言
+    if (settings.defaultSource) {
+      sourceLangSelect.value = settings.defaultSource;
+    }
+    if (settings.defaultTarget) {
+      targetLangSelect.value = settings.defaultTarget;
+    }
 
     // 获取选中文本
     getSelectedText();
@@ -79,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 加载语言列表
-  async function loadLanguages(settings) {
+  async function loadLanguages() {
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'getLanguages'
@@ -112,14 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
           option2.textContent = `${lang.name} (${lang.code})`;
           targetLangSelect.appendChild(option2);
         });
-        
-        // 在加载完语言列表后设置默认语言
-        if (settings.defaultSource) {
-          sourceLangSelect.value = settings.defaultSource;
-        }
-        if (settings.defaultTarget) {
-          targetLangSelect.value = settings.defaultTarget;
-        }
       } else {
         showError(`加载语言列表失败：${response.error}`);
       }
